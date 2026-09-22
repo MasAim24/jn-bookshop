@@ -1,0 +1,45 @@
+name: Build Windows Executable (.exe)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Build Windows Desktop App (.exe)
+    runs-on: windows-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: 📥 Install Dependencies
+        run: |
+          pnpm install
+          pnpm add -D electron electron-builder
+
+      - name: 🔨 Compile Frontend & Build Windows .EXE
+        run: |
+          pnpm run build
+          npx electron-builder --win nsis portable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📤 Upload Windows .EXE Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: JN-Book-Stationary-Windows-EXE
+          path: |
+            dist_electron/*.exe
+          retention-days: 30

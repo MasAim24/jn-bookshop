@@ -1,0 +1,39 @@
+{
+  "appId": "com.jnbookshop.pos",
+  "productName": "JN Book & Stationary Shop",
+  "copyright": "Copyright © 2026 JN Book & Stationary Shop",
+  "directories": {
+    "output": "dist_electron"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "package.json"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "public/favicon.ico",
+    "artifactName": "${productName}-${version}-${target}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "JN Book & Stationary Shop",
+    "runAfterFinish": true
+  },
+  "portable": {
+    "artifactName": "${productName}-Portable.${ext}"
+  }
+}
