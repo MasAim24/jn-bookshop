@@ -82,15 +82,31 @@ export interface PrinterConfig {
   showCashierName: boolean;
 }
 
+export interface SecurityConfig {
+  enablePinProtection: boolean;
+  ownerPin: string; // 4-6 digit numeric PIN, default: '1234'
+  protectReports: boolean;
+  protectInventory: boolean;
+  protectSettings: boolean;
+  protectDatabase: boolean;
+}
+
+export interface BackupPreferences {
+  autoBackupOnShiftClose: boolean;
+  lastBackupDate?: string;
+}
+
 export interface DatabaseBackup {
   version: string;
   exportedAt: string;
   storeProfile: StoreProfile;
   printerConfig: PrinterConfig;
+  securityConfig?: SecurityConfig;
   products: ProductItem[];
   transactions: POSTransaction[];
   shifts?: CashierShift[];
   cashMovements?: CashMovement[];
+  heldOrders?: HeldOrder[];
 }
 
 // Model Shift Kasir & Rekap Kas Laci (Pilihan 1)

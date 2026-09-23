@@ -10,7 +10,8 @@ import {
   CheckCircle2, 
   Printer, 
   History,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Download
 } from 'lucide-react';
 import { CashierShift, CashMovement, StoreProfile } from '../../types/pos';
 import { dbService, formatRupiah } from '../../services/db';
@@ -88,6 +89,28 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
     const res = dbService.closeShift(actualCash, closeNotes);
     setClosedShiftResult(res);
     onShiftChange();
+
+    // Auto-backup jika preferensi aktif
+    const prefs = dbService.getBackupPreferences();
+    if (prefs.autoBackupOnShiftClose && res) {
+      setTimeout(() => {
+        try {
+          const jsonStr = dbService.exportDatabase();
+          const blob = new Blob([jsonStr], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          const now = new Date();
+          const dateStr = now.toISOString().split('T')[0];
+          link.download = `JN-AutoBackup-Shift-${res.id}-${dateStr}.json`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } catch (e) {
+          console.error('Auto backup failed:', e);
+        }
+      }, 500);
+    }
   };
 
   return (
@@ -633,6 +656,26 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
               </div>
 
               <div className="flex justify-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const jsonStr = dbService.exportDatabase();
+                    const blob = new Blob([jsonStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    const dateStr = new Date().toISOString().split('T')[0];
+                    link.download = `JN-Backup-Shift-${closedShiftResult.id}-${dateStr}.json`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Cadangkan JSON</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => window.print()}

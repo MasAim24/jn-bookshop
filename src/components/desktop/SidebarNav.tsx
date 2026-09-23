@@ -6,8 +6,9 @@ import {
   Printer, 
   Database, 
   Settings, 
-  AlertTriangle,
-  BookOpen
+  BookOpen,
+  Lock,
+  Unlock
 } from 'lucide-react';
 
 export type NavTab = 'pos' | 'inventory' | 'reports' | 'printer' | 'database' | 'settings';
@@ -17,13 +18,21 @@ interface SidebarNavProps {
   setActiveTab: (tab: NavTab) => void;
   cartCount: number;
   lowStockCount: number;
+  isOwnerUnlocked: boolean;
+  onLock: () => void;
+  onUnlockRequest: (targetTab?: NavTab) => void;
+  isTabProtected: (tab: NavTab) => boolean;
 }
 
 export const SidebarNav: React.FC<SidebarNavProps> = ({
   activeTab,
   setActiveTab,
   cartCount,
-  lowStockCount
+  lowStockCount,
+  isOwnerUnlocked,
+  onLock,
+  onUnlockRequest,
+  isTabProtected
 }) => {
   const navItems = [
     {
@@ -68,8 +77,16 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
     }
   ];
 
+  const handleTabClick = (tabId: NavTab) => {
+    if (isTabProtected(tabId) && !isOwnerUnlocked) {
+      onUnlockRequest(tabId);
+    } else {
+      setActiveTab(tabId);
+    }
+  };
+
   return (
-    <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 shrink-0">
+    <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 shrink-0 select-none">
       {/* Store Banner */}
       <div className="p-4 border-b border-slate-800 flex items-center space-x-3 bg-slate-950/40">
         <div className="w-10 h-10 rounded-lg bg-emerald-600/90 text-white flex items-center justify-center shadow-md">
@@ -90,12 +107,13 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
+          const locked = isTabProtected(item.id) && !isOwnerUnlocked;
 
           return (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all ${
+              onClick={() => handleTabClick(item.id)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer ${
                 isActive
                   ? 'bg-emerald-600 text-white font-medium shadow-sm'
                   : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'
@@ -104,32 +122,73 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               <div className="flex items-center space-x-3 min-w-0">
                 <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
                 <div className="min-w-0">
-                  <div className="text-xs truncate">{item.label}</div>
+                  <div className="text-xs truncate flex items-center gap-1.5">
+                    <span>{item.label}</span>
+                    {locked && (
+                      <span title="Dilindungi PIN Owner">
+                        <Lock className="w-3 h-3 text-amber-400 shrink-0 inline" />
+                      </span>
+                    )}
+                  </div>
                   <div className={`text-[10px] truncate ${isActive ? 'text-emerald-100' : 'text-slate-500'}`}>
                     {item.sublabel}
                   </div>
                 </div>
               </div>
 
-              {item.badge && (
-                <span className={`text-[10px] px-2 py-0.5 rounded-full ${item.badgeColor} ml-2 shrink-0`}>
-                  {item.badge}
-                </span>
-              )}
+              <div className="flex items-center gap-1.5">
+                {locked && !isActive && (
+                  <span className="text-[9px] bg-slate-800 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
+                    PIN
+                  </span>
+                )}
+                {item.badge && (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${item.badgeColor} ml-1 shrink-0`}>
+                    {item.badge}
+                  </span>
+                )}
+              </div>
             </button>
           );
         })}
       </nav>
 
-      {/* Footer Status */}
-      <div className="p-3 border-t border-slate-800 bg-slate-950/60 text-[11px] text-slate-400">
-        <div className="flex items-center justify-between">
-          <span className="text-slate-500">Versi Desktop</span>
-          <span className="font-mono text-slate-300">v1.0.0 (Win64)</span>
+      {/* Security Status Card & Footer */}
+      <div className="p-3 border-t border-slate-800 bg-slate-950/60 text-[11px] space-y-2">
+        <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800">
+          <div className="flex items-center gap-1.5 font-semibold">
+            {isOwnerUnlocked ? (
+              <>
+                <Unlock className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-emerald-400 text-xs">Owner Aktif</span>
+              </>
+            ) : (
+              <>
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-slate-400 text-xs">Kasir Terkunci</span>
+              </>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={isOwnerUnlocked ? onLock : () => onUnlockRequest()}
+            className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+              isOwnerUnlocked
+                ? 'bg-rose-950/70 hover:bg-rose-900 border-rose-800 text-rose-300'
+                : 'bg-emerald-950/70 hover:bg-emerald-900 border-emerald-700 text-emerald-300'
+            }`}
+          >
+            {isOwnerUnlocked ? 'Kunci Akses' : 'Buka Kunci'}
+          </button>
         </div>
-        <div className="flex items-center space-x-1.5 mt-1.5 text-emerald-400">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
-          <span className="truncate">Database Lokal SQLite Siap</span>
+
+        <div className="flex items-center justify-between text-slate-500 pt-1">
+          <span>Versi Desktop</span>
+          <span className="font-mono text-slate-400">v1.1.0 (Win64)</span>
+        </div>
+        <div className="flex items-center space-x-1.5 text-emerald-400">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+          <span className="truncate text-[10px]">Database Lokal SQLite Siap</span>
         </div>
       </div>
     </aside>

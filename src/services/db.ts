@@ -1,4 +1,4 @@
-import { ProductItem, POSTransaction, StoreProfile, PrinterConfig, DatabaseBackup, HeldOrder, CashierShift, CashMovement } from '../types/pos';
+import { ProductItem, POSTransaction, StoreProfile, PrinterConfig, DatabaseBackup, HeldOrder, CashierShift, CashMovement, SecurityConfig, BackupPreferences } from '../types/pos';
 
 // Kunci penyimpanan lokal
 const STORAGE_KEYS = {
@@ -9,7 +9,24 @@ const STORAGE_KEYS = {
   HELD_ORDERS: 'jnb_pos_held_orders_v1',
   SHIFTS: 'jnb_pos_shifts_v1',
   CASH_MOVEMENTS: 'jnb_pos_cash_movements_v1',
+  SECURITY: 'jnb_pos_security_v1',
+  BACKUP_PREFS: 'jnb_pos_backup_prefs_v1',
   INITIALIZED: 'jnb_pos_initialized_v1'
+};
+
+// Konfigurasi Keamanan PIN Bawaan
+export const DEFAULT_SECURITY_CONFIG: SecurityConfig = {
+  enablePinProtection: true,
+  ownerPin: '1234',
+  protectReports: true,
+  protectInventory: true,
+  protectSettings: true,
+  protectDatabase: true
+};
+
+// Konfigurasi Preferensi Backup Bawaan
+export const DEFAULT_BACKUP_PREFS: BackupPreferences = {
+  autoBackupOnShiftClose: true
 };
 
 // Data Profil Toko Awal
@@ -957,35 +974,143 @@ class DatabaseService {
     };
   }
 
+  // --- KEAMANAN & KUNCI PIN OTORISASI ---
+  public getSecurityConfig(): SecurityConfig {
+    if (!this.isBrowser) return DEFAULT_SECURITY_CONFIG;
+    const raw = localStorage.getItem(STORAGE_KEYS.SECURITY);
+    return raw ? { ...DEFAULT_SECURITY_CONFIG, ...JSON.parse(raw) } : DEFAULT_SECURITY_CONFIG;
+  }
+
+  public saveSecurityConfig(config: SecurityConfig): void {
+    if (!this.isBrowser) return;
+    localStorage.setItem(STORAGE_KEYS.SECURITY, JSON.stringify(config));
+  }
+
+  public verifyPin(inputPin: string): boolean {
+    const config = this.getSecurityConfig();
+    if (!config.enablePinProtection) return true;
+    return config.ownerPin.trim() === inputPin.trim();
+  }
+
+  public updatePin(oldPin: string, newPin: string): { success: boolean; message: string } {
+    const config = this.getSecurityConfig();
+    if (config.ownerPin !== oldPin.trim()) {
+      return { success: false, message: 'PIN lama yang Anda masukkan salah!' };
+    }
+    if (newPin.trim().length < 4 || newPin.trim().length > 8) {
+      return { success: false, message: 'PIN baru harus terdiri dari 4 hingga 8 digit angka!' };
+    }
+    config.ownerPin = newPin.trim();
+    this.saveSecurityConfig(config);
+    return { success: true, message: 'PIN Otorisasi Owner berhasil diperbarui!' };
+  }
+
+  // --- PREFERENSI CADANGAN (BACKUP) ---
+  public getBackupPreferences(): BackupPreferences {
+    if (!this.isBrowser) return DEFAULT_BACKUP_PREFS;
+    const raw = localStorage.getItem(STORAGE_KEYS.BACKUP_PREFS);
+    return raw ? { ...DEFAULT_BACKUP_PREFS, ...JSON.parse(raw) } : DEFAULT_BACKUP_PREFS;
+  }
+
+  public saveBackupPreferences(prefs: BackupPreferences): void {
+    if (!this.isBrowser) return;
+    localStorage.setItem(STORAGE_KEYS.BACKUP_PREFS, JSON.stringify(prefs));
+  }
+
   // --- EKSPOR & IMPOR DATABASE SQLITE / JSON ---
   public exportDatabase(): string {
     const backup: DatabaseBackup = {
-      version: '1.0.0',
+      version: '1.1.0',
       exportedAt: new Date().toISOString(),
       storeProfile: this.getStoreProfile(),
       printerConfig: this.getPrinterConfig(),
+      securityConfig: this.getSecurityConfig(),
       products: this.getProducts(),
-      transactions: this.getTransactions()
+      transactions: this.getTransactions(),
+      shifts: this.getShifts(),
+      cashMovements: this.getCashMovements(),
+      heldOrders: this.getHeldOrders()
     };
+
+    if (this.isBrowser) {
+      const prefs = this.getBackupPreferences();
+      prefs.lastBackupDate = new Date().toISOString();
+      this.saveBackupPreferences(prefs);
+    }
+
     return JSON.stringify(backup, null, 2);
   }
 
-  public importDatabase(jsonString: string): boolean {
+  public importDatabase(
+    jsonString: string,
+    mode: 'replace' | 'merge' = 'replace'
+  ): { success: boolean; message: string; stats?: { products: number; transactions: number; shifts: number } } {
     try {
       const data = JSON.parse(jsonString) as DatabaseBackup;
-      if (!data.products || !Array.isArray(data.products)) {
-        throw new Error('Format data tidak valid: produk tidak ditemukan');
+      if (!data || !data.products || !Array.isArray(data.products)) {
+        return { success: false, message: 'Format data tidak valid: Data produk tidak ditemukan dalam file cadangan.' };
       }
 
-      if (data.products) localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(data.products));
-      if (data.transactions) localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(data.transactions));
-      if (data.storeProfile) localStorage.setItem(STORAGE_KEYS.STORE_PROFILE, JSON.stringify(data.storeProfile));
-      if (data.printerConfig) localStorage.setItem(STORAGE_KEYS.PRINTER_CONFIG, JSON.stringify(data.printerConfig));
+      if (mode === 'replace') {
+        localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(data.products));
+        if (data.transactions) localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(data.transactions));
+        if (data.storeProfile) localStorage.setItem(STORAGE_KEYS.STORE_PROFILE, JSON.stringify(data.storeProfile));
+        if (data.printerConfig) localStorage.setItem(STORAGE_KEYS.PRINTER_CONFIG, JSON.stringify(data.printerConfig));
+        if (data.securityConfig) localStorage.setItem(STORAGE_KEYS.SECURITY, JSON.stringify(data.securityConfig));
+        if (data.shifts) localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(data.shifts));
+        if (data.cashMovements) localStorage.setItem(STORAGE_KEYS.CASH_MOVEMENTS, JSON.stringify(data.cashMovements));
+        if (data.heldOrders) localStorage.setItem(STORAGE_KEYS.HELD_ORDERS, JSON.stringify(data.heldOrders));
+      } else {
+        // Merge mode:
+        const currentProducts = this.getProducts();
+        const productMap = new Map(currentProducts.map(p => [p.id, p]));
+        for (const p of data.products) {
+          productMap.set(p.id, p);
+        }
+        localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(Array.from(productMap.values())));
 
-      return true;
-    } catch (e) {
+        if (data.transactions && Array.isArray(data.transactions)) {
+          const currentTx = this.getTransactions();
+          const txMap = new Map(currentTx.map(t => [t.id, t]));
+          for (const t of data.transactions) {
+            txMap.set(t.id, t);
+          }
+          localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(Array.from(txMap.values())));
+        }
+
+        if (data.shifts && Array.isArray(data.shifts)) {
+          const currentShifts = this.getShifts();
+          const shiftMap = new Map(currentShifts.map(s => [s.id, s]));
+          for (const s of data.shifts) {
+            shiftMap.set(s.id, s);
+          }
+          localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(Array.from(shiftMap.values())));
+        }
+
+        if (data.cashMovements && Array.isArray(data.cashMovements)) {
+          const currentMov = this.getCashMovements();
+          const movMap = new Map(currentMov.map(m => [m.id, m]));
+          for (const m of data.cashMovements) {
+            movMap.set(m.id, m);
+          }
+          localStorage.setItem(STORAGE_KEYS.CASH_MOVEMENTS, JSON.stringify(Array.from(movMap.values())));
+        }
+      }
+
+      return {
+        success: true,
+        message: mode === 'replace' 
+          ? 'Seluruh database berhasil dipulihkan secara bersih dari file cadangan!' 
+          : 'Data berhasil digabungkan (merge) ke database yang sedang berjalan!',
+        stats: {
+          products: data.products.length,
+          transactions: data.transactions ? data.transactions.length : 0,
+          shifts: data.shifts ? data.shifts.length : 0
+        }
+      };
+    } catch (e: any) {
       console.error('Import database failed:', e);
-      return false;
+      return { success: false, message: `Gagal memulihkan database: ${e.message || 'File JSON tidak valid atau rusak.'}` };
     }
   }
 
