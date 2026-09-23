@@ -443,7 +443,7 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
               <p className="text-xs text-slate-600">Coba kata kunci lain atau scan barcode produk</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-2.5 sm:gap-3">
               {filteredProducts.map(product => {
                 const isService = product.type === 'jasa';
                 const isOutOfStock = !isService && product.stock <= 0;
@@ -459,7 +459,7 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
                       }
                       addToCart(product);
                     }}
-                    className={`group relative p-3 rounded-2xl border transition-all text-left flex flex-col justify-between cursor-pointer ${
+                    className={`group relative p-2.5 sm:p-3 rounded-xl border transition-all text-left flex flex-col justify-between cursor-pointer ${
                       isOutOfStock
                         ? 'bg-slate-900/40 border-slate-800/60 opacity-60 cursor-not-allowed'
                         : isService
@@ -469,8 +469,8 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
                   >
                     <div>
                       {/* Badge Tipe & Stok */}
-                      <div className="flex items-center justify-between gap-1.5 mb-2">
-                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 ${
+                      <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                        <span className={`text-[10px] sm:text-[10.5px] px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 shrink-0 ${
                           product.type === 'buku'
                             ? 'bg-blue-950/80 text-blue-300 border border-blue-800/60'
                             : product.type === 'alat_tulis'
@@ -479,23 +479,23 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
                         }`}>
                           {product.type === 'buku' ? (
                             <>
-                              <BookOpen className="w-3 h-3 text-blue-400" />
+                              <BookOpen className="w-3 h-3 text-blue-400 shrink-0" />
                               <span>Buku</span>
                             </>
                           ) : product.type === 'alat_tulis' ? (
                             <>
-                              <PenTool className="w-3 h-3 text-amber-400" />
+                              <PenTool className="w-3 h-3 text-amber-400 shrink-0" />
                               <span>ATK</span>
                             </>
                           ) : (
                             <>
-                              <Printer className="w-3 h-3 text-purple-400" />
+                              <Printer className="w-3 h-3 text-purple-400 shrink-0" />
                               <span>Jasa</span>
                             </>
                           )}
                         </span>
 
-                        <span className={`text-[11px] font-mono px-2 py-0.5 rounded-md font-bold ${
+                        <span className={`text-[10px] sm:text-[10.5px] font-mono px-1.5 py-0.5 rounded-md font-semibold whitespace-nowrap shrink-0 ${
                           isService
                             ? 'bg-purple-950/60 text-purple-300 border border-purple-800/40'
                             : isOutOfStock
@@ -504,24 +504,37 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
                             ? 'bg-amber-950 text-amber-300 border border-amber-800/60 animate-pulse'
                             : 'bg-slate-800 text-slate-300'
                         }`}>
-                          {isService ? `Per ${product.unit}` : isOutOfStock ? 'Habis' : `Stok: ${product.stock} ${product.unit}`}
+                          {isService ? `Per ${product.unit}` : isOutOfStock ? 'Habis' : `${product.stock} ${product.unit}`}
                         </span>
                       </div>
 
-                      {/* Nama Produk (Lebih Besar & Jelas) */}
-                      <h4 className="font-bold text-sm text-slate-100 group-hover:text-emerald-300 transition-colors line-clamp-2 leading-snug">
+                      {/* Nama Produk (Ukuran Pas & Rapi, 2 baris seimbang) */}
+                      <h4 
+                        className="font-semibold text-xs sm:text-[13px] text-slate-100 group-hover:text-emerald-300 transition-colors line-clamp-2 leading-snug min-h-[2.2rem] sm:min-h-[2.35rem]"
+                        title={product.name}
+                      >
                         {product.name}
                       </h4>
 
                       {/* Kategori & Lokasi Rak */}
-                      <p className="text-xs text-slate-400 mt-1.5 truncate">
-                        {product.category} {product.shelfLocation && <span className="text-slate-500 font-mono">• Rak {product.shelfLocation}</span>}
-                      </p>
+                      <div className="mt-1.5 flex items-center justify-between text-[10.5px] sm:text-[11px] text-slate-400 gap-1 overflow-hidden">
+                        <span className="truncate" title={product.category}>
+                          {product.category}
+                        </span>
+                        {product.shelfLocation && (
+                          <span 
+                            className="text-[10px] text-slate-400 font-mono shrink-0 px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700/60"
+                            title={`Lokasi Rak: ${product.shelfLocation}`}
+                          >
+                            {product.shelfLocation}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Harga & Tombol Tambah Lebih Besar */}
-                    <div className="mt-3 pt-2.5 border-t border-slate-800 flex items-center justify-between gap-2">
-                      <div className="font-extrabold text-sm lg:text-base font-mono text-emerald-400 tabular-nums">
+                    {/* Harga & Tombol Tambah Proporsional */}
+                    <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                      <div className="font-bold text-xs sm:text-[13px] lg:text-sm font-mono text-emerald-400 tabular-nums truncate">
                         {formatRupiah(product.sellPrice)}
                       </div>
 
@@ -536,10 +549,10 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
                           }
                           addToCart(product);
                         }}
-                        className="w-9 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-90 text-white flex items-center justify-center transition-all shadow-md group-hover:shadow-emerald-950/80 cursor-pointer"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-90 text-white flex items-center justify-center transition-all shadow-xs shrink-0 cursor-pointer"
                         title="Tambah ke keranjang"
                       >
-                        <Plus className="w-4 h-4 stroke-[2.5]" />
+                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                       </button>
                     </div>
                   </div>
