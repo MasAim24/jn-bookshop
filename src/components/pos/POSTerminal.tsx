@@ -14,12 +14,19 @@ import {
   AlertCircle,
   Tag,
   CheckCircle2,
-  Package
+  Package,
+  ShoppingCart,
+  Volume2,
+  VolumeX,
+  Wallet,
+  Printer
 } from 'lucide-react';
-import { ProductItem, POSCartItem, HeldOrder, StoreProfile } from '../../types/pos';
+import { ProductItem, POSCartItem, HeldOrder, StoreProfile, CashierShift } from '../../types/pos';
 import { dbService, formatRupiah } from '../../services/db';
+import { soundService } from '../../services/sound';
 import { PaymentModal } from './PaymentModal';
 import { ReceiptModal } from './ReceiptModal';
+import { ShiftModal } from './ShiftModal';
 
 interface POSTerminalProps {
   products: ProductItem[];
@@ -34,17 +41,29 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
 }) => {
   const [cart, setCart] = useState<POSCartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'semua' | 'buku' | 'alat_tulis'>('semua');
+  const [selectedCategory, setSelectedCategory] = useState<'semua' | 'buku' | 'alat_tulis' | 'jasa'>('semua');
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
+  const [activeShift, setActiveShift] = useState<CashierShift | null>(null);
   const [activeReceiptTx, setActiveReceiptTx] = useState<any | null>(null);
   const [barcodeNotification, setBarcodeNotification] = useState<string | null>(null);
+  const [isMuted, setIsMuted] = useState<boolean>(soundService.isMuted());
   
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Load held orders
+  const toggleMute = () => {
+    setIsMuted(soundService.toggleMute());
+  };
+
+  const refreshShift = () => {
+    setActiveShift(dbService.getActiveShift());
+  };
+
+  // Load held orders & active shift
   useEffect(() => {
     setHeldOrders(dbService.getHeldOrders());
+    refreshShift();
   }, []);
 
   // Autofocus barcode search input on mount and on shortcut
@@ -58,6 +77,11 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
         searchInputRef.current?.focus();
         searchInputRef.current?.select();
       }
+      // F2 to hold order
+      if (e.key === 'F2') {
+        e.preventDefault();
+        handleHoldOrder();
+      }
       // F12 to checkout
       if (e.key === 'F12' && cart.length > 0) {
         e.preventDefault();
@@ -67,7 +91,7 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart]);
+  }, [cart, heldOrders]);
 
   // Filter produk
   const filteredProducts = products.filter(p => {
@@ -80,6 +104,7 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
     if (!matchesSearch) return false;
     if (selectedCategory === 'buku') return p.type === 'buku';
     if (selectedCategory === 'alat_tulis') return p.type === 'alat_tulis';
+    if (selectedCategory === 'jasa') return p.type === 'jasa';
     return true;
   });
 
@@ -94,6 +119,7 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
     );
 
     if (exactMatch) {
+      soundService.playScan();
       addToCart(exactMatch);
       setBarcodeNotification(`Berhasil scan: ${exactMatch.name}`);
       setSearchQuery('');
@@ -103,16 +129,22 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
 
     // Jika ada 1 hasil filter pencarian, tambahkan langsung
     if (filteredProducts.length === 1) {
+      soundService.playScan();
       addToCart(filteredProducts[0]);
       setBarcodeNotification(`Ditambahkan: ${filteredProducts[0].name}`);
       setSearchQuery('');
       setTimeout(() => setBarcodeNotification(null), 2500);
+      return;
     }
+
+    // Jika tidak ditemukan
+    soundService.playError();
   };
 
   // Tambah item ke keranjang
   const addToCart = (product: ProductItem) => {
     if (product.stock <= 0) {
+      soundService.playError();
       alert(`Stok produk "${product.name}" habis! Silakan lakukan restok terlebih dahulu.`);
       return;
     }
@@ -121,9 +153,11 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
       const existing = prev.find(item => item.product.id === product.id);
       if (existing) {
         if (existing.quantity >= product.stock) {
+          soundService.playError();
           alert(`Jumlah melebihi stok yang tersedia (${product.stock} ${product.unit})`);
           return prev;
         }
+        soundService.playAdd();
         return prev.map(item =>
           item.product.id === product.id
             ? {
@@ -139,6 +173,7 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
             : item
         );
       } else {
+        soundService.playScan();
         return [
           ...prev,
           {
@@ -277,36 +312,62 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
       <div className="flex-1 flex flex-col border-r border-slate-800 min-w-0">
         {/* Top Filter Bar */}
         <div className="p-3 border-b border-slate-800 bg-slate-900/80 space-y-2.5">
-          <form onSubmit={handleBarcodeSubmit} className="flex gap-2">
-            <div className="relative flex-1">
-              <Barcode className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Scan barcode / ISBN atau ketik nama buku/ATK... (Tekan Enter)"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 font-sans"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 text-xs px-1"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
+          <div className="flex items-center gap-2">
+            <form onSubmit={handleBarcodeSubmit} className="flex-1 flex gap-2">
+              <div className="relative flex-1">
+                <Barcode className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Scan barcode / ISBN atau ketik nama buku/ATK... (Tekan Enter)"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 font-sans"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 text-xs px-1"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
 
+              <button
+                type="submit"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer"
+              >
+                <Search className="w-4 h-4" />
+                <span>Cari (F1)</span>
+              </button>
+            </form>
+
+            {/* Tombol Shift Kasir */}
             <button
-              type="submit"
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
+              type="button"
+              onClick={() => setIsShiftModalOpen(true)}
+              className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-2 transition-all shadow-xs shrink-0 cursor-pointer ${
+                activeShift
+                  ? 'bg-slate-800/90 hover:bg-slate-700 border-slate-700 text-slate-200'
+                  : 'bg-amber-950/80 hover:bg-amber-900 border-amber-600/80 text-amber-300 animate-pulse'
+              }`}
+              title={activeShift ? `Shift aktif: ${activeShift.cashierName} (Saldo: ${formatRupiah(activeShift.expectedCash)})` : 'Shift kasir belum dibuka, klik untuk buka shift'}
             >
-              <Search className="w-4 h-4" />
-              <span>Cari (F1)</span>
+              <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                <Wallet className="w-3.5 h-3.5" />
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="leading-tight text-[11px] font-bold">
+                  {activeShift ? activeShift.cashierName : 'Buka Shift'}
+                </span>
+                <span className="text-[10px] font-mono text-emerald-400">
+                  {activeShift ? formatRupiah(activeShift.expectedCash) : 'Kas Tutup'}
+                </span>
+              </div>
             </button>
-          </form>
+          </div>
 
           {/* Notifikasi Barcode Beep */}
           {barcodeNotification && (
@@ -326,7 +387,7 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
                   : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
               }`}
             >
-              Semua Produk ({products.length})
+              Semua ({products.length})
             </button>
             <button
               onClick={() => setSelectedCategory('buku')}
@@ -350,6 +411,17 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
               <PenTool className="w-3.5 h-3.5" />
               <span>Alat Tulis (ATK)</span>
             </button>
+            <button
+              onClick={() => setSelectedCategory('jasa')}
+              className={`px-3 py-1.5 rounded-md font-medium flex items-center gap-1.5 transition-all ${
+                selectedCategory === 'jasa'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Layanan & Jasa</span>
+            </button>
 
             {/* Held Orders Count Indicator */}
             {heldOrders.length > 0 && (
@@ -363,7 +435,7 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
         </div>
 
         {/* Product Cards Grid */}
-        <div className="flex-1 overflow-y-auto p-3">
+        <div className="flex-1 overflow-y-auto p-3.5">
           {filteredProducts.length === 0 ? (
             <div className="h-64 flex flex-col items-center justify-center text-slate-500 space-y-2">
               <Package className="w-12 h-12 stroke-1 text-slate-600" />
@@ -371,65 +443,103 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
               <p className="text-xs text-slate-600">Coba kata kunci lain atau scan barcode produk</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
               {filteredProducts.map(product => {
-                const isOutOfStock = product.stock <= 0;
-                const isLowStock = product.stock > 0 && product.stock <= product.minStockAlert;
+                const isService = product.type === 'jasa';
+                const isOutOfStock = !isService && product.stock <= 0;
+                const isLowStock = !isService && product.stock > 0 && product.stock <= product.minStockAlert;
 
                 return (
                   <div
                     key={product.id}
-                    onClick={() => !isOutOfStock && addToCart(product)}
-                    className={`group relative p-2.5 rounded-xl border transition-all text-left flex flex-col justify-between cursor-pointer ${
+                    onClick={() => {
+                      if (isOutOfStock) {
+                        soundService.playError();
+                        return;
+                      }
+                      addToCart(product);
+                    }}
+                    className={`group relative p-3 rounded-2xl border transition-all text-left flex flex-col justify-between cursor-pointer ${
                       isOutOfStock
                         ? 'bg-slate-900/40 border-slate-800/60 opacity-60 cursor-not-allowed'
-                        : 'bg-slate-900 border-slate-800 hover:border-emerald-500/60 hover:bg-slate-850 hover:shadow-md'
+                        : isService
+                        ? 'bg-slate-900/90 border-slate-800 hover:border-purple-500/60 hover:bg-slate-850 hover:shadow-lg active:scale-[0.99]'
+                        : 'bg-slate-900/90 border-slate-800 hover:border-emerald-500/60 hover:bg-slate-850 hover:shadow-lg active:scale-[0.99]'
                     }`}
                   >
                     <div>
                       {/* Badge Tipe & Stok */}
-                      <div className="flex items-center justify-between gap-1 mb-1.5">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                      <div className="flex items-center justify-between gap-1.5 mb-2">
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 ${
                           product.type === 'buku'
-                            ? 'bg-blue-950 text-blue-300 border border-blue-800/40'
-                            : 'bg-amber-950 text-amber-300 border border-amber-800/40'
+                            ? 'bg-blue-950/80 text-blue-300 border border-blue-800/60'
+                            : product.type === 'alat_tulis'
+                            ? 'bg-amber-950/80 text-amber-300 border border-amber-800/60'
+                            : 'bg-purple-950/80 text-purple-300 border border-purple-800/60'
                         }`}>
-                          {product.type === 'buku' ? 'Buku' : 'ATK'}
+                          {product.type === 'buku' ? (
+                            <>
+                              <BookOpen className="w-3 h-3 text-blue-400" />
+                              <span>Buku</span>
+                            </>
+                          ) : product.type === 'alat_tulis' ? (
+                            <>
+                              <PenTool className="w-3 h-3 text-amber-400" />
+                              <span>ATK</span>
+                            </>
+                          ) : (
+                            <>
+                              <Printer className="w-3 h-3 text-purple-400" />
+                              <span>Jasa</span>
+                            </>
+                          )}
                         </span>
 
-                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-medium ${
-                          isOutOfStock
-                            ? 'bg-rose-950 text-rose-400 border border-rose-800/50'
+                        <span className={`text-[11px] font-mono px-2 py-0.5 rounded-md font-bold ${
+                          isService
+                            ? 'bg-purple-950/60 text-purple-300 border border-purple-800/40'
+                            : isOutOfStock
+                            ? 'bg-rose-950 text-rose-300 border border-rose-800/60'
                             : isLowStock
-                            ? 'bg-amber-950 text-amber-400 border border-amber-800/50'
+                            ? 'bg-amber-950 text-amber-300 border border-amber-800/60 animate-pulse'
                             : 'bg-slate-800 text-slate-300'
                         }`}>
-                          {isOutOfStock ? 'Habis' : `Stok: ${product.stock} ${product.unit}`}
+                          {isService ? `Per ${product.unit}` : isOutOfStock ? 'Habis' : `Stok: ${product.stock} ${product.unit}`}
                         </span>
                       </div>
 
-                      {/* Nama Produk */}
-                      <h4 className="font-medium text-xs text-slate-100 group-hover:text-emerald-300 transition-colors line-clamp-2 leading-snug">
+                      {/* Nama Produk (Lebih Besar & Jelas) */}
+                      <h4 className="font-bold text-sm text-slate-100 group-hover:text-emerald-300 transition-colors line-clamp-2 leading-snug">
                         {product.name}
                       </h4>
 
                       {/* Kategori & Lokasi Rak */}
-                      <p className="text-[10px] text-slate-400 mt-1 truncate">
-                        {product.category} • <span className="text-slate-500">{product.shelfLocation}</span>
+                      <p className="text-xs text-slate-400 mt-1.5 truncate">
+                        {product.category} {product.shelfLocation && <span className="text-slate-500 font-mono">• Rak {product.shelfLocation}</span>}
                       </p>
                     </div>
 
-                    <div className="mt-2.5 pt-2 border-t border-slate-800/70 flex items-center justify-between">
-                      <div className="font-bold text-xs font-mono text-emerald-400">
+                    {/* Harga & Tombol Tambah Lebih Besar */}
+                    <div className="mt-3 pt-2.5 border-t border-slate-800 flex items-center justify-between gap-2">
+                      <div className="font-extrabold text-sm lg:text-base font-mono text-emerald-400 tabular-nums">
                         {formatRupiah(product.sellPrice)}
                       </div>
 
                       <button
                         type="button"
                         disabled={isOutOfStock}
-                        className="w-6 h-6 rounded bg-emerald-600/80 group-hover:bg-emerald-500 text-white flex items-center justify-center transition-transform group-hover:scale-105"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isOutOfStock) {
+                            soundService.playError();
+                            return;
+                          }
+                          addToCart(product);
+                        }}
+                        className="w-9 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-90 text-white flex items-center justify-center transition-all shadow-md group-hover:shadow-emerald-950/80 cursor-pointer"
+                        title="Tambah ke keranjang"
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Plus className="w-4 h-4 stroke-[2.5]" />
                       </button>
                     </div>
                   </div>
@@ -438,64 +548,129 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
             </div>
           )}
         </div>
+
+        {/* Bottom Shortcuts Cheat-sheet & Audio Controls Bar */}
+        <div className="px-4 py-2 border-t border-slate-800 bg-slate-950/90 flex items-center justify-between text-xs text-slate-400 shrink-0">
+          <div className="flex items-center gap-3 overflow-x-auto">
+            <div className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 font-mono text-[11px] text-slate-200">F1</kbd>
+              <span>Scan/Cari</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 font-mono text-[11px] text-slate-200">F2</kbd>
+              <span>Tahan Nota</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 font-mono text-[11px] text-emerald-400 font-bold">F12</kbd>
+              <span>Bayar Cepat</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 font-mono text-[11px] text-slate-200">Esc</kbd>
+              <span>Tutup/Batal</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={toggleMute}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-medium text-slate-300 transition-colors shrink-0 cursor-pointer"
+            title={isMuted ? 'Aktifkan Suara Beep Kasir' : 'Bisukan Suara Beep Kasir'}
+          >
+            {isMuted ? (
+              <>
+                <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+                <span className="text-[11px] text-rose-400 font-medium">Bisu (Muted)</span>
+              </>
+            ) : (
+              <>
+                <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-[11px] text-emerald-400 font-medium">Beep Aktif</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* =========================================
           BAGIAN KANAN: KERANJANG BELANJA & CHECKOUT
           ========================================= */}
-      <div className="w-96 bg-slate-900 flex flex-col shrink-0">
+      <div className="w-[430px] lg:w-[480px] xl:w-[520px] bg-slate-900 border-l border-slate-800 flex flex-col shrink-0 shadow-2xl">
         {/* Header Keranjang */}
-        <div className="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
-          <div className="flex items-center gap-2">
-            <h3 className="font-bold text-sm text-slate-100">Keranjang Kasir</h3>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-mono">
+        <div className="p-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+              <ShoppingCart className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-slate-100 leading-tight">Keranjang Kasir</h3>
+              <span className="text-[11px] text-slate-400">Daftar item belanja pelanggan</span>
+            </div>
+            <span className="ml-1 text-xs px-2.5 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 font-mono font-bold">
               {totalItemsCount} item
             </span>
           </div>
 
           {cart.length > 0 && (
             <button
-              onClick={() => setCart([])}
-              className="text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1"
+              onClick={() => {
+                if (confirm('Kosongkan semua barang dalam keranjang ini?')) {
+                  setCart([]);
+                }
+              }}
+              className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 font-medium border border-rose-900/40"
+              title="Kosongkan seluruh keranjang"
             >
-              <RotateCcw className="w-3 h-3" />
+              <RotateCcw className="w-3.5 h-3.5" />
               <span>Reset</span>
             </button>
           )}
         </div>
 
         {/* Daftar Barang dalam Keranjang */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        <div className="flex-1 overflow-y-auto p-3.5 space-y-3">
           {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-2">
-              <Barcode className="w-10 h-10 text-slate-700 stroke-1" />
-              <p className="text-xs font-medium text-slate-400">Keranjang Masih Kosong</p>
-              <p className="text-[11px] text-slate-600 text-center max-w-[200px]">
-                Scan barcode barang atau klik produk di katalog untuk menambahkan
-              </p>
+            <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-3 px-4">
+              <div className="w-16 h-16 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center shadow-inner">
+                <Barcode className="w-8 h-8 text-slate-600 stroke-1" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-semibold text-slate-300">Keranjang Masih Kosong</p>
+                <p className="text-xs text-slate-500 mt-1 max-w-[260px] leading-relaxed">
+                  Scan barcode barang atau klik produk di katalog sebelah kiri untuk mulai transaksi kasir
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <span className="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] font-mono text-emerald-400">
+                  F1: Scan Barcode
+                </span>
+                <span className="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-[11px] font-mono text-emerald-400">
+                  F12: Bayar Cepat
+                </span>
+              </div>
 
               {/* Tampilkan jika ada pesanan tertahan */}
               {heldOrders.length > 0 && (
                 <div className="mt-4 w-full pt-3 border-t border-slate-800">
-                  <p className="text-[11px] font-semibold text-amber-400 mb-1.5 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
+                  <p className="text-xs font-semibold text-amber-400 mb-2 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
                     <span>Pesanan Tertahan ({heldOrders.length})</span>
                   </p>
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     {heldOrders.map(order => (
                       <div
                         key={order.id}
-                        className="p-2 rounded bg-slate-800/80 border border-slate-700 text-xs flex items-center justify-between"
+                        className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-xs flex items-center justify-between shadow-xs"
                       >
                         <div>
-                          <div className="font-medium text-slate-200">{order.customerLabel}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">
+                          <div className="font-semibold text-slate-200">{order.customerLabel}</div>
+                          <div className="text-[11px] text-slate-400 font-mono mt-0.5">
                             {order.items.length} item • {formatRupiah(order.subtotal)}
                           </div>
                         </div>
                         <button
                           onClick={() => handleRecallOrder(order)}
-                          className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-[10px] font-medium"
+                          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition-colors shadow-xs"
                         >
                           Panggil
                         </button>
@@ -509,35 +684,46 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
             cart.map(item => (
               <div
                 key={item.product.id}
-                className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 transition-colors"
+                className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/90 hover:border-slate-700/80 transition-all shadow-xs space-y-2.5"
               >
-                <div className="flex items-start justify-between gap-2">
+                {/* Baris 1: Nama Produk, Harga Satuan & Tombol Hapus */}
+                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <h5 className="font-medium text-xs text-slate-100 truncate">
+                    <h5 className="font-semibold text-sm lg:text-base text-slate-100 leading-snug">
                       {item.product.name}
                     </h5>
-                    <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                      {formatRupiah(item.unitPrice)} / {item.product.unit}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400 font-mono mt-1">
+                      <span className="text-slate-300 font-medium">
+                        {formatRupiah(item.unitPrice)} <span className="text-slate-500">/ {item.product.unit}</span>
+                      </span>
+                      {item.product.shelfLocation && (
+                        <span className="text-[11px] text-slate-500 font-sans">
+                          • Rak {item.product.shelfLocation}
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   <button
                     onClick={() => removeFromCart(item.product.id)}
-                    className="text-slate-500 hover:text-rose-400 p-1"
-                    title="Hapus item"
+                    className="w-8 h-8 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/50 flex items-center justify-center transition-colors shrink-0"
+                    title="Hapus barang dari keranjang"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
 
-                {/* Stepper Jumlah & Subtotal */}
-                <div className="mt-2 pt-2 border-t border-slate-900 flex items-center justify-between">
-                  <div className="flex items-center space-x-1.5">
+                {/* Baris 2: Stepper Kuantitas + Tombol Diskon + Subtotal Nominal Besar */}
+                <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                  {/* Stepper Jumlah */}
+                  <div className="flex items-center space-x-1.5 shrink-0">
                     <button
+                      type="button"
                       onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                      className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center"
+                      className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 flex items-center justify-center font-bold text-base transition-all"
+                      title="Kurangi 1"
                     >
-                      <Minus className="w-3 h-3" />
+                      <Minus className="w-4 h-4" />
                     </button>
                     <input
                       type="number"
@@ -545,25 +731,50 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
                       max={item.product.stock}
                       value={item.quantity}
                       onChange={(e) => updateQuantity(item.product.id, parseInt(e.target.value) || 1)}
-                      className="w-10 text-center py-0.5 bg-slate-900 border border-slate-700 rounded text-xs font-mono text-slate-100"
+                      className="w-14 h-8 text-center bg-slate-900 border border-slate-700 rounded-lg text-sm lg:text-base font-bold font-mono text-slate-100 focus:outline-none focus:border-emerald-500"
                     />
                     <button
+                      type="button"
                       onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                      className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center"
+                      className="w-8 h-8 rounded-lg bg-emerald-700 hover:bg-emerald-600 active:scale-95 text-white flex items-center justify-center font-bold text-base transition-all shadow-xs"
+                      title="Tambah 1"
                     >
-                      <Plus className="w-3 h-3" />
+                      <Plus className="w-4 h-4" />
+                    </button>
+
+                    {/* Tombol Diskon Per Item */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const currentVal = item.discountValue || 0;
+                        const val = prompt(`Masukkan diskon persen (%) untuk "${item.product.name}":`, String(currentVal));
+                        if (val !== null) {
+                          const num = parseFloat(val) || 0;
+                          updateItemDiscount(item.product.id, 'percentage', Math.max(0, Math.min(100, num)));
+                        }
+                      }}
+                      className={`h-8 px-2 rounded-lg text-xs font-mono font-medium flex items-center gap-1 border transition-colors ${
+                        item.discountValue > 0
+                          ? 'bg-amber-950/60 border-amber-700/80 text-amber-300'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                      }`}
+                      title="Atur diskon per item"
+                    >
+                      <Percent className="w-3 h-3" />
+                      <span>{item.discountValue > 0 ? `${item.discountValue}%` : 'Disc'}</span>
                     </button>
                   </div>
 
-                  <div className="text-right">
-                    <div className="font-bold text-xs font-mono text-emerald-400">
-                      {formatRupiah(item.subtotal)}
-                    </div>
+                  {/* Nominal Subtotal Item (Besar & Kontras) */}
+                  <div className="text-right pl-2">
                     {item.discountValue > 0 && (
-                      <div className="text-[10px] text-amber-400 font-mono">
-                        Diskon: {item.discountValue}%
+                      <div className="text-[11px] text-slate-500 line-through font-mono">
+                        {formatRupiah(item.unitPrice * item.quantity)}
                       </div>
                     )}
+                    <div className="font-extrabold text-base lg:text-lg font-mono text-emerald-400 tabular-nums tracking-tight">
+                      {formatRupiah(item.subtotal)}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -572,36 +783,44 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
         </div>
 
         {/* Rangkuman Biaya & Tombol Bayar */}
-        <div className="p-3 border-t border-slate-800 bg-slate-950/60 space-y-2.5">
-          <div className="space-y-1 text-xs">
-            <div className="flex justify-between text-slate-400">
-              <span>Subtotal</span>
-              <span className="font-mono text-slate-200">{formatRupiah(subtotalCart)}</span>
+        <div className="p-4 border-t border-slate-800 bg-slate-950/90 space-y-3">
+          {/* Display Board Kasir / Layar Total Tagihan */}
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border border-emerald-500/30 shadow-lg space-y-2">
+            <div className="flex justify-between text-xs lg:text-sm text-slate-400">
+              <span>Subtotal ({totalItemsCount} item)</span>
+              <span className="font-mono text-slate-200 font-semibold">{formatRupiah(subtotalCart)}</span>
             </div>
+
             {totalDiscount > 0 && (
-              <div className="flex justify-between text-amber-400">
-                <span>Diskon</span>
-                <span className="font-mono">-{formatRupiah(totalDiscount)}</span>
+              <div className="flex justify-between text-xs lg:text-sm text-amber-400 font-medium">
+                <span>Total Potongan Diskon</span>
+                <span className="font-mono font-bold">-{formatRupiah(totalDiscount)}</span>
               </div>
             )}
-            <div className="flex justify-between items-baseline pt-1.5 border-t border-slate-800">
-              <span className="font-bold text-sm text-slate-100">Total Tagihan</span>
-              <span className="font-bold text-xl font-mono text-emerald-400">
-                {formatRupiah(grandTotalCart)}
-              </span>
+
+            <div className="pt-2.5 border-t border-slate-800/80 flex items-baseline justify-between gap-2">
+              <div>
+                <span className="text-xs font-bold tracking-wider text-slate-300 uppercase block">Total Bayar</span>
+                <span className="text-[10px] text-emerald-400/80 font-mono font-medium">F12 untuk Bayar Cepat</span>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl lg:text-4xl font-black font-mono tracking-tight text-emerald-400 tabular-nums drop-shadow-sm">
+                  {formatRupiah(grandTotalCart)}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Tombol Tahan & Bayar */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* Tombol Tahan & Bayar Kasir */}
+          <div className="grid grid-cols-4 gap-2.5">
             <button
               type="button"
               disabled={cart.length === 0}
               onClick={handleHoldOrder}
-              className="py-2.5 px-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 rounded-lg text-xs font-medium flex items-center justify-center gap-1 transition-colors"
-              title="Tahan transaksi untuk antrian lain"
+              className="col-span-1 h-14 bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-all"
+              title="Tahan transaksi untuk melayani antrian berikutnya"
             >
-              <Clock className="w-3.5 h-3.5 text-amber-400" />
+              <Clock className="w-4 h-4 text-amber-400" />
               <span>Tahan</span>
             </button>
 
@@ -609,9 +828,9 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
               type="button"
               disabled={cart.length === 0}
               onClick={() => setIsPaymentModalOpen(true)}
-              className="col-span-2 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/50 transition-all"
+              className="col-span-3 h-14 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-base lg:text-lg font-black tracking-wide flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-950/60 transition-all cursor-pointer"
             >
-              <CreditCard className="w-4 h-4" />
+              <CreditCard className="w-5 h-5" />
               <span>BAYAR (F12)</span>
             </button>
           </div>
@@ -626,11 +845,15 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
           discountTotal={totalDiscount}
           grandTotal={grandTotalCart}
           storeProfile={storeProfile}
-          onClose={() => setIsPaymentModalOpen(false)}
+          onClose={() => {
+            setIsPaymentModalOpen(false);
+            setTimeout(() => searchInputRef.current?.focus(), 100);
+          }}
           onSuccess={(transaction) => {
             setIsPaymentModalOpen(false);
             setCart([]);
             refreshData();
+            refreshShift();
             setActiveReceiptTx(transaction);
           }}
         />
@@ -641,7 +864,29 @@ export const POSTerminal: React.FC<POSTerminalProps> = ({
         <ReceiptModal
           transaction={activeReceiptTx}
           storeProfile={storeProfile}
-          onClose={() => setActiveReceiptTx(null)}
+          onClose={() => {
+            setActiveReceiptTx(null);
+            setTimeout(() => {
+              searchInputRef.current?.focus();
+              searchInputRef.current?.select();
+            }, 100);
+          }}
+        />
+      )}
+
+      {/* Modal Shift Kasir & Rekap Laci */}
+      {isShiftModalOpen && (
+        <ShiftModal
+          activeShift={activeShift}
+          storeProfile={storeProfile}
+          onClose={() => {
+            setIsShiftModalOpen(false);
+            setTimeout(() => searchInputRef.current?.focus(), 100);
+          }}
+          onShiftChange={() => {
+            refreshShift();
+            refreshData();
+          }}
         />
       )}
     </div>

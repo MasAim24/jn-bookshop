@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Banknote, 
@@ -9,10 +9,13 @@ import {
   Printer, 
   AlertTriangle,
   User,
-  Phone
+  Phone,
+  Delete,
+  Calculator
 } from 'lucide-react';
 import { POSCartItem, POSTransaction, StoreProfile, PaymentMethod } from '../../types/pos';
 import { dbService, formatRupiah } from '../../services/db';
+import { soundService } from '../../services/sound';
 
 interface PaymentModalProps {
   cart: POSCartItem[];
@@ -39,27 +42,99 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [referenceNumber, setReferenceNumber] = useState<string>('');
   const [autoPrint, setAutoPrint] = useState<boolean>(true);
+  const [showNumpad, setShowNumpad] = useState<boolean>(true);
 
   // Kalkulasi kembalian
   const changeAmount = paymentMethod === 'cash' ? Math.max(0, cashTendered - grandTotal) : 0;
   const isInsufficientCash = paymentMethod === 'cash' && cashTendered < grandTotal;
 
-  // Tombol pecahan uang cepat
-  const quickCashOptions = [
-    { label: 'Uang Pas', value: grandTotal },
-    { label: 'Rp 20.000', value: 20000 },
-    { label: 'Rp 50.000', value: 50000 },
-    { label: 'Rp 100.000', value: 100000 },
-    { label: 'Rp 150.000', value: 150000 },
-    { label: 'Rp 200.000', value: 200000 },
-    { label: 'Rp 500.000', value: 500000 }
-  ];
+  // Generate Pecahan Uang Dinamis Berdasarkan Grand Total
+  const dynamicQuickCash = React.useMemo(() => {
+    const list: { label: string; value: number }[] = [
+      { label: 'Uang Pas', value: grandTotal }
+    ];
+
+    const roundSteps = [
+      Math.ceil(grandTotal / 5000) * 5000,
+      Math.ceil(grandTotal / 10000) * 10000,
+      Math.ceil(grandTotal / 20000) * 20000,
+      Math.ceil(grandTotal / 50000) * 5000,
+      Math.ceil(grandTotal / 50000) * 50000,
+      Math.ceil(grandTotal / 100000) * 100000
+    ];
+
+    const commonCashNominals = [20000, 50000, 100000, 200000, 500000];
+
+    const uniqueValues = Array.from(new Set([...roundSteps, ...commonCashNominals]))
+      .filter(val => val > grandTotal)
+      .sort((a, b) => a - b)
+      .slice(0, 5);
+
+    uniqueValues.forEach(val => {
+      list.push({ label: formatRupiah(val), value: val });
+    });
+
+    return list;
+  }, [grandTotal]);
+
+  // Listener Keyboard: Esc untuk keluar, Enter untuk selesaikan
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+      if (e.key === 'Enter') {
+        // Hanya jika tidak di textarea/input teks tertentu
+        const target = e.target as HTMLElement;
+        if (target && target.tagName === 'INPUT' && target.getAttribute('type') === 'text') {
+          return;
+        }
+        if (!isInsufficientCash) {
+          e.preventDefault();
+          handleCompleteTransaction();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cashTendered, isInsufficientCash, grandTotal]);
+
+  // Numpad Touch Handler
+  const handleNumpadInput = (char: string) => {
+    soundService.playAdd();
+    if (char === 'C') {
+      setCashTendered(0);
+      return;
+    }
+    if (char === 'BACK') {
+      const str = String(cashTendered);
+      if (str.length <= 1) {
+        setCashTendered(0);
+      } else {
+        setCashTendered(parseInt(str.slice(0, -1)) || 0);
+      }
+      return;
+    }
+    if (char === 'PAS') {
+      setCashTendered(grandTotal);
+      return;
+    }
+
+    const currentStr = cashTendered === 0 ? '' : String(cashTendered);
+    const newStr = currentStr + char;
+    setCashTendered(parseInt(newStr) || 0);
+  };
 
   const handleCompleteTransaction = () => {
     if (isInsufficientCash) {
+      soundService.playError();
       alert('Nominal uang tunai yang diterima kurang dari total tagihan!');
       return;
     }
+
+    soundService.playSuccess();
 
     // Hitung total modal HPP untuk analitika laba bersih
     const totalCostHPP = cart.reduce(
@@ -99,35 +174,39 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl animate-scaleUp">
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl animate-scaleUp">
         {/* Modal Header */}
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60 shrink-0">
           <div>
-            <h3 className="font-bold text-base text-slate-100">Pembayaran Kasir</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Pilih metode pembayaran dan masukkan nominal</p>
+            <h3 className="font-bold text-base text-slate-100 flex items-center gap-2">
+              <Banknote className="w-5 h-5 text-emerald-400" />
+              <span>Pembayaran Kasir</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">Pilih metode pembayaran dan masukkan nominal bayar</p>
           </div>
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+            title="Tutup (Esc)"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-5 space-y-5">
+        <div className="p-5 space-y-4 overflow-y-auto flex-1">
           {/* Banner Tagihan */}
-          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border border-emerald-500/30 flex items-center justify-between shadow-lg">
             <div>
-              <span className="text-xs text-slate-400">Total Tagihan Belanja</span>
-              <div className="text-2xl font-bold font-mono text-emerald-400">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Tagihan Belanja</span>
+              <div className="text-3xl lg:text-4xl font-black font-mono tracking-tight text-emerald-400 tabular-nums">
                 {formatRupiah(grandTotal)}
               </div>
             </div>
             <div className="text-right text-xs text-slate-400">
-              <div>Total Item: <span className="text-slate-200 font-semibold">{cart.length} jenis</span></div>
+              <div>Total Item: <span className="text-slate-200 font-bold">{cart.length} jenis</span></div>
               {discountTotal > 0 && (
-                <div className="text-amber-400">Diskon: -{formatRupiah(discountTotal)}</div>
+                <div className="text-amber-400 font-medium mt-0.5">Diskon: -{formatRupiah(discountTotal)}</div>
               )}
             </div>
           </div>
@@ -148,7 +227,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 }`}
               >
                 <Banknote className="w-5 h-5" />
-                <span className="text-xs font-medium">Tunai</span>
+                <span className="text-xs font-semibold">Tunai</span>
               </button>
 
               <button
@@ -161,7 +240,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 }`}
               >
                 <QrCode className="w-5 h-5" />
-                <span className="text-xs font-medium">QRIS</span>
+                <span className="text-xs font-semibold">QRIS</span>
               </button>
 
               <button
@@ -174,7 +253,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 }`}
               >
                 <CreditCard className="w-5 h-5" />
-                <span className="text-xs font-medium">EDC / Debit</span>
+                <span className="text-xs font-semibold">EDC / Debit</span>
               </button>
 
               <button
@@ -187,57 +266,133 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 }`}
               >
                 <Building2 className="w-5 h-5" />
-                <span className="text-xs font-medium">Transfer</span>
+                <span className="text-xs font-semibold">Transfer</span>
               </button>
             </div>
           </div>
 
           {/* Area Spesifik Tiap Metode Bayar */}
           {paymentMethod === 'cash' ? (
-            <div className="space-y-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">
+            <div className="space-y-3.5 bg-slate-950/70 p-4 rounded-xl border border-slate-800">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-300">
                   Uang Tunai Diterima (Rp)
                 </label>
-                <input
-                  type="number"
-                  value={cashTendered || ''}
-                  onChange={(e) => setCashTendered(Number(e.target.value))}
-                  className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-lg text-lg font-bold font-mono text-emerald-400 focus:outline-none focus:border-emerald-500"
-                />
+                <button
+                  type="button"
+                  onClick={() => setShowNumpad(!showNumpad)}
+                  className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                >
+                  <Calculator className="w-3.5 h-3.5" />
+                  <span>{showNumpad ? 'Sembunyikan Numpad' : 'Buka Numpad Layar'}</span>
+                </button>
               </div>
 
-              {/* Pecahan Uang Cepat */}
-              <div className="flex flex-wrap gap-1.5">
-                {quickCashOptions.map((opt, idx) => (
+              <input
+                type="number"
+                value={cashTendered || ''}
+                onChange={(e) => setCashTendered(Number(e.target.value))}
+                className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-2xl lg:text-3xl font-black font-mono text-emerald-400 focus:outline-none focus:border-emerald-500 shadow-inner"
+              />
+
+              {/* Pecahan Uang Cepat Dinamis */}
+              <div className="flex flex-wrap gap-2">
+                {dynamicQuickCash.map((opt, idx) => (
                   <button
                     key={idx}
                     type="button"
-                    onClick={() => setCashTendered(opt.value)}
-                    className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono font-medium transition-colors"
+                    onClick={() => {
+                      soundService.playAdd();
+                      setCashTendered(opt.value);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg active:scale-95 text-xs font-mono font-bold transition-all border ${
+                      opt.label === 'Uang Pas'
+                        ? 'bg-emerald-600/30 border-emerald-500/80 text-emerald-300'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700/60'
+                    }`}
                   >
                     {opt.label}
                   </button>
                 ))}
               </div>
 
+              {/* Numpad Virtual Touchscreen */}
+              {showNumpad && (
+                <div className="pt-2 border-t border-slate-800/80">
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {['7', '8', '9', 'C'].map((btn) => (
+                      <button
+                        key={btn}
+                        type="button"
+                        onClick={() => handleNumpadInput(btn)}
+                        className={`h-11 rounded-lg font-bold font-mono text-sm transition-all active:scale-95 ${
+                          btn === 'C'
+                            ? 'bg-rose-950/60 hover:bg-rose-900/80 border border-rose-800 text-rose-300'
+                            : 'bg-slate-800 hover:bg-slate-750 text-slate-100 border border-slate-700/80 shadow-xs'
+                        }`}
+                      >
+                        {btn}
+                      </button>
+                    ))}
+                    {['4', '5', '6', 'BACK'].map((btn) => (
+                      <button
+                        key={btn}
+                        type="button"
+                        onClick={() => handleNumpadInput(btn)}
+                        className={`h-11 rounded-lg font-bold font-mono text-sm transition-all active:scale-95 flex items-center justify-center ${
+                          btn === 'BACK'
+                            ? 'bg-amber-950/60 hover:bg-amber-900/80 border border-amber-800 text-amber-300'
+                            : 'bg-slate-800 hover:bg-slate-750 text-slate-100 border border-slate-700/80 shadow-xs'
+                        }`}
+                      >
+                        {btn === 'BACK' ? <Delete className="w-4 h-4" /> : btn}
+                      </button>
+                    ))}
+                    {['1', '2', '3', '000'].map((btn) => (
+                      <button
+                        key={btn}
+                        type="button"
+                        onClick={() => handleNumpadInput(btn)}
+                        className="h-11 rounded-lg font-bold font-mono text-sm transition-all active:scale-95 bg-slate-800 hover:bg-slate-750 text-slate-100 border border-slate-700/80 shadow-xs"
+                      >
+                        {btn}
+                      </button>
+                    ))}
+                    {['0', '00', 'PAS'].map((btn) => (
+                      <button
+                        key={btn}
+                        type="button"
+                        onClick={() => handleNumpadInput(btn)}
+                        className={`h-11 rounded-lg font-bold font-mono text-sm transition-all active:scale-95 ${
+                          btn === 'PAS'
+                            ? 'col-span-2 bg-emerald-700 hover:bg-emerald-600 text-white font-sans'
+                            : 'bg-slate-800 hover:bg-slate-750 text-slate-100 border border-slate-700/80 shadow-xs'
+                        }`}
+                      >
+                        {btn === 'PAS' ? 'Uang Pas' : btn}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Tampilan Kembalian */}
-              <div className={`p-3 rounded-lg border flex items-center justify-between ${
+              <div className={`p-4 rounded-xl border flex items-center justify-between transition-all ${
                 isInsufficientCash
-                  ? 'bg-rose-950/40 border-rose-800 text-rose-300'
-                  : 'bg-emerald-950/40 border-emerald-800/80 text-emerald-300'
+                  ? 'bg-rose-950/50 border-rose-800/80 text-rose-300'
+                  : 'bg-emerald-950/50 border-emerald-700/80 text-emerald-300 shadow-md'
               }`}>
-                <div className="text-xs">
+                <div>
                   {isInsufficientCash ? (
-                    <div className="flex items-center gap-1.5 text-rose-400 font-semibold">
-                      <AlertTriangle className="w-4 h-4" />
+                    <div className="flex items-center gap-1.5 text-rose-400 font-bold text-xs uppercase tracking-wider">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
                       <span>Uang Kurang Sebesar:</span>
                     </div>
                   ) : (
-                    <span>Kembalian:</span>
+                    <span className="font-bold text-xs uppercase tracking-wider text-emerald-400/90">Uang Kembalian:</span>
                   )}
                 </div>
-                <div className="font-bold text-lg font-mono">
+                <div className="font-black text-2xl lg:text-3xl font-mono tabular-nums">
                   {formatRupiah(isInsufficientCash ? grandTotal - cashTendered : changeAmount)}
                 </div>
               </div>

@@ -17,6 +17,9 @@ export const App: React.FC = () => {
   const [transactions, setTransactions] = useState<POSTransaction[]>([]);
   const [storeProfile, setStoreProfile] = useState<StoreProfile>(dbService.getStoreProfile());
   const [cartCount, setCartCount] = useState<number>(0);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('jn_pos_theme') as 'dark' | 'light') || 'dark';
+  });
 
   // Sinkronisasi data dari DB lokal
   const refreshAllData = () => {
@@ -29,12 +32,28 @@ export const App: React.FC = () => {
     refreshAllData();
   }, []);
 
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('jn_pos_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
   const lowStockCount = products.filter(p => p.stock <= p.minStockAlert).length;
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden font-sans select-none antialiased">
       {/* 1. Windows Desktop Custom Title Bar */}
-      <WindowsTitleBar />
+      <WindowsTitleBar theme={theme} toggleTheme={toggleTheme} />
 
       {/* 2. Main App Content with Sidebar and Views */}
       <div className="flex-1 flex overflow-hidden">
@@ -60,6 +79,7 @@ export const App: React.FC = () => {
             <InventoryManager
               products={products}
               refreshData={refreshAllData}
+              storeProfile={storeProfile}
             />
           )}
 

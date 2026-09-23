@@ -42,42 +42,8 @@
     --radius-full: 9999px;
   }
 
-  [data-theme="dark"] {
-    /* Semantic Tokens - Dark Mode */
-    --bg-surface: #121517;
-    --bg-elevated: #1B2024;
-    --bg-card: #1E252A;
-    --bg-muted: #273038;
-    --bg-overlay: rgba(5, 7, 9, 0.75);
-
-    --text-primary: #F4F6F5;
-    --text-secondary: #A3AFA8;
-    --text-muted: #727F77;
-    --text-inverse: #121517;
-
-    --border-subtle: #29343D;
-    --border-strong: #384652;
-
-    --brand-primary: #E86B47;
-    --brand-primary-hover: #F27E5C;
-    --brand-primary-light: #2D1E19;
-
-    --brand-secondary: #3D5549;
-    --brand-secondary-hover: #4E6C5D;
-
-    --accent-gold: #DDB058;
-    --accent-gold-bg: #2B2313;
-
-    --status-success: #38B2A3;
-    --status-success-bg: #142825;
-    --status-warning: #F08066;
-    --status-warning-bg: #2E1B17;
-  }
-
   body {
     font-family: var(--font-sans);
-    background-color: var(--bg-surface);
-    color: var(--text-primary);
     margin: 0;
     padding: 0;
     transition: background-color 0.25s ease, color 0.25s ease;
@@ -91,6 +57,138 @@
     font-family: var(--font-serif);
   }
 }
+
+/* ========================================================
+   Tailwind CSS v4 Theme Overrides for Light & Dark Mode
+   ======================================================== */
+:root, [data-theme="dark"] {
+  --color-slate-950: #020617;
+  --color-slate-900: #0f172a;
+  --color-slate-850: #141e33;
+  --color-slate-800: #1e293b;
+    --color-slate-750: #27354a;
+    --color-slate-700: #334155;
+    --color-slate-600: #475569;
+    --color-slate-500: #64748b;
+    --color-slate-400: #94a3b8;
+    --color-slate-300: #cbd5e1;
+    --color-slate-200: #e2e8f0;
+    --color-slate-100: #f8fafc;
+    --color-slate-50:  #ffffff;
+
+    --color-emerald-950: #022c22;
+    --color-emerald-900: #064e3b;
+    --color-emerald-800: #065f46;
+    --color-emerald-700: #047857;
+    --color-emerald-600: #059669;
+    --color-emerald-500: #10b981;
+    --color-emerald-400: #34d399;
+    --color-emerald-300: #6ee7b7;
+
+    --color-amber-950: #451a03;
+    --color-amber-900: #78350f;
+    --color-amber-800: #92400e;
+    --color-amber-700: #b45309;
+    --color-amber-600: #d97706;
+    --color-amber-500: #f59e0b;
+    --color-amber-400: #fbbf24;
+    --color-amber-300: #fcd34d;
+
+    --color-blue-950: #172554;
+    --color-blue-900: #1e3a8a;
+    --color-blue-800: #1e40af;
+    --color-blue-700: #1d4ed8;
+    --color-blue-600: #2563eb;
+    --color-blue-500: #3b82f6;
+    --color-blue-400: #60a5fa;
+    --color-blue-300: #93c5fd;
+
+    --color-rose-950: #4c0519;
+    --color-rose-900: #881337;
+    --color-rose-800: #9f1239;
+    --color-rose-700: #be123c;
+    --color-rose-600: #e11d48;
+    --color-rose-500: #f43f5e;
+    --color-rose-400: #fb7185;
+    --color-rose-300: #fda4af;
+  }
+
+  [data-theme="light"], :root[data-theme="light"], html[data-theme="light"] {
+    /* Invert Slate for Light SaaS POS UI */
+    --color-slate-950: #f1f5f9; /* main canvas background */
+    --color-slate-900: #ffffff; /* cards, panels, sidebar, header */
+    --color-slate-850: #f8fafc; /* card hover */
+    --color-slate-800: #e2e8f0; /* borders */
+    --color-slate-750: #cbd5e1;
+    --color-slate-700: #cbd5e1; /* sub-borders / input borders */
+    --color-slate-600: #94a3b8;
+    --color-slate-500: #64748b; /* muted text */
+    --color-slate-400: #475569; /* secondary readable text */
+    --color-slate-300: #334155; /* bold secondary */
+    --color-slate-200: #1e293b; /* near dark text */
+    --color-slate-100: #0f172a; /* primary dark text */
+    --color-slate-50:  #020617;
+
+    /* Emerald for Light Mode */
+    --color-emerald-950: #ecfdf5; /* light green badge background */
+    --color-emerald-900: #d1fae5;
+    --color-emerald-800: #a7f3d0; /* badge border */
+    --color-emerald-700: #047857;
+    --color-emerald-600: #059669; /* buttons */
+    --color-emerald-500: #10b981;
+    --color-emerald-400: #047857; /* readable text on light surface */
+    --color-emerald-300: #065f46;
+    --color-emerald-200: #064e3b;
+    --color-emerald-100: #022c22;
+
+    /* Amber for Light Mode */
+    --color-amber-950: #fffbeb;
+    --color-amber-900: #fef3c7;
+    --color-amber-800: #fde68a;
+    --color-amber-700: #b45309;
+    --color-amber-600: #d97706;
+    --color-amber-500: #d97706;
+    --color-amber-400: #b45309;
+    --color-amber-300: #92400e;
+    --color-amber-200: #78350f;
+    --color-amber-100: #451a03;
+
+    /* Blue for Light Mode */
+    --color-blue-950: #eff6ff;
+    --color-blue-900: #dbeafe;
+    --color-blue-800: #bfdbfe;
+    --color-blue-700: #1d4ed8;
+    --color-blue-600: #2563eb;
+    --color-blue-500: #2563eb;
+    --color-blue-400: #1d4ed8;
+    --color-blue-300: #1e40af;
+    --color-blue-200: #1e3a8a;
+    --color-blue-100: #172554;
+
+    /* Rose for Light Mode */
+    --color-rose-950: #fff1f2;
+    --color-rose-900: #ffe4e6;
+    --color-rose-800: #fecdd3;
+    --color-rose-700: #be123c;
+    --color-rose-600: #e11d48;
+    --color-rose-500: #e11d48;
+    --color-rose-400: #be123c;
+    --color-rose-300: #9f1239;
+    --color-rose-200: #881337;
+    --color-rose-100: #4c0519;
+
+    /* Purple for Light Mode */
+    --color-purple-950: #faf5ff;
+    --color-purple-900: #f3e8ff;
+    --color-purple-800: #e9d5ff;
+    --color-purple-700: #7e22ce;
+    --color-purple-600: #9333ea;
+    --color-purple-500: #a855f7;
+    --color-purple-400: #7e22ce;
+    --color-purple-300: #6b21a8;
+    --color-purple-200: #581c87;
+    --color-purple-100: #3b0764;
+  }
 
 /* Custom Literary & Interactive Utilities */
 .book-spine-shadow {
@@ -134,6 +232,74 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--brand-primary);
+}
+
+/* High Contrast POS Alert / Notice Boxes */
+.pos-alert-amber {
+  background-color: rgba(245, 158, 11, 0.12) !important;
+  border: 1px solid rgba(217, 119, 6, 0.35) !important;
+}
+.pos-alert-amber .pos-alert-title {
+  color: #78350f !important;
+  font-weight: 700;
+}
+.pos-alert-amber .pos-alert-desc {
+  color: #92400e !important;
+  font-weight: 500;
+}
+.pos-alert-amber .pos-alert-icon {
+  color: #b45309 !important;
+}
+
+[data-theme="dark"] .pos-alert-amber,
+.dark .pos-alert-amber {
+  background-color: rgba(69, 26, 3, 0.75) !important;
+  border-color: rgba(180, 83, 9, 0.6) !important;
+}
+[data-theme="dark"] .pos-alert-amber .pos-alert-title,
+.dark .pos-alert-amber .pos-alert-title {
+  color: #fde68a !important;
+}
+[data-theme="dark"] .pos-alert-amber .pos-alert-desc,
+.dark .pos-alert-amber .pos-alert-desc {
+  color: #fcd34d !important;
+}
+[data-theme="dark"] .pos-alert-amber .pos-alert-icon,
+.dark .pos-alert-amber .pos-alert-icon {
+  color: #fbbf24 !important;
+}
+
+.pos-alert-emerald {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  border: 1px solid rgba(5, 150, 105, 0.35) !important;
+}
+.pos-alert-emerald .pos-alert-title {
+  color: #064e3b !important;
+  font-weight: 700;
+}
+.pos-alert-emerald .pos-alert-desc {
+  color: #065f46 !important;
+}
+.pos-alert-emerald .pos-alert-icon {
+  color: #059669 !important;
+}
+
+[data-theme="dark"] .pos-alert-emerald,
+.dark .pos-alert-emerald {
+  background-color: rgba(2, 44, 34, 0.75) !important;
+  border-color: rgba(6, 95, 70, 0.8) !important;
+}
+[data-theme="dark"] .pos-alert-emerald .pos-alert-title,
+.dark .pos-alert-emerald .pos-alert-title {
+  color: #a7f3d0 !important;
+}
+[data-theme="dark"] .pos-alert-emerald .pos-alert-desc,
+.dark .pos-alert-emerald .pos-alert-desc {
+  color: #6ee7b7 !important;
+}
+[data-theme="dark"] .pos-alert-emerald .pos-alert-icon,
+.dark .pos-alert-emerald .pos-alert-icon {
+  color: #34d399 !important;
 }
 
 /* =========================================

@@ -1,4 +1,4 @@
-import { ProductItem, POSTransaction, StoreProfile, PrinterConfig, DatabaseBackup, HeldOrder } from '../types/pos';
+import { ProductItem, POSTransaction, StoreProfile, PrinterConfig, DatabaseBackup, HeldOrder, CashierShift, CashMovement } from '../types/pos';
 
 // Kunci penyimpanan lokal
 const STORAGE_KEYS = {
@@ -7,6 +7,8 @@ const STORAGE_KEYS = {
   STORE_PROFILE: 'jnb_pos_store_profile_v1',
   PRINTER_CONFIG: 'jnb_pos_printer_config_v1',
   HELD_ORDERS: 'jnb_pos_held_orders_v1',
+  SHIFTS: 'jnb_pos_shifts_v1',
+  CASH_MOVEMENTS: 'jnb_pos_cash_movements_v1',
   INITIALIZED: 'jnb_pos_initialized_v1'
 };
 
@@ -309,6 +311,178 @@ export const INITIAL_PRODUCTS: ProductItem[] = [
     imageUrl: 'https://images.unsplash.com/photo-1569683795645-b62e50fbf103?q=80&w=400&auto=format&fit=crop',
     createdAt: '2026-09-01T08:00:00Z',
     updatedAt: '2026-09-22T10:00:00Z'
+  },
+
+  // --- KATEGORI LAYANAN & JASA PERCETAKAN ---
+  {
+    id: 'prod-jasa-01',
+    barcode: 'JASA-FC-01',
+    name: 'Fotocopy HVS A4/F4 (Hitam Putih)',
+    type: 'jasa',
+    category: 'Fotocopy & Dokumen',
+    brandOrPublisher: 'Mesin Canon IR 6000',
+    costPrice: 100,
+    sellPrice: 350,
+    stock: 99999,
+    minStockAlert: 0,
+    unit: 'Lembar',
+    shelfLocation: 'Mesin Fotocopy Depan',
+    imageUrl: 'https://images.unsplash.com/photo-1588702547923-7093a6c3ba33?q=80&w=400&auto=format&fit=crop',
+    createdAt: '2026-09-01T08:00:00Z',
+    updatedAt: '2026-09-22T10:00:00Z'
+  },
+  {
+    id: 'prod-jasa-02',
+    barcode: 'JASA-FC-02',
+    name: 'Fotocopy Warna A4/F4',
+    type: 'jasa',
+    category: 'Fotocopy & Dokumen',
+    brandOrPublisher: 'Mesin Konica Minolta',
+    costPrice: 500,
+    sellPrice: 1500,
+    stock: 99999,
+    minStockAlert: 0,
+    unit: 'Lembar',
+    shelfLocation: 'Mesin Fotocopy Warna',
+    imageUrl: 'https://images.unsplash.com/photo-1588702547923-7093a6c3ba33?q=80&w=400&auto=format&fit=crop',
+    createdAt: '2026-09-01T08:00:00Z',
+    updatedAt: '2026-09-22T10:00:00Z'
+  },
+  {
+    id: 'prod-jasa-03',
+    barcode: 'JASA-PR-01',
+    name: 'Print Dokumen Hitam Putih (HVS A4/F4)',
+    type: 'jasa',
+    category: 'Print & Digital Output',
+    brandOrPublisher: 'Print Station Kasir',
+    costPrice: 150,
+    sellPrice: 500,
+    stock: 99999,
+    minStockAlert: 0,
+    unit: 'Lembar',
+    shelfLocation: 'PC Kasir / Cetak',
+    imageUrl: 'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?q=80&w=400&auto=format&fit=crop',
+    createdAt: '2026-09-01T08:00:00Z',
+    updatedAt: '2026-09-22T10:00:00Z'
+  },
+  {
+    id: 'prod-jasa-04',
+    barcode: 'JASA-PR-02',
+    name: 'Print Dokumen Warna / Makalah / Proposal',
+    type: 'jasa',
+    category: 'Print & Digital Output',
+    brandOrPublisher: 'Epson L-Series Inkjet',
+    costPrice: 800,
+    sellPrice: 2500,
+    stock: 99999,
+    minStockAlert: 0,
+    unit: 'Lembar',
+    shelfLocation: 'PC Kasir / Cetak',
+    imageUrl: 'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?q=80&w=400&auto=format&fit=crop',
+    createdAt: '2026-09-01T08:00:00Z',
+    updatedAt: '2026-09-22T10:00:00Z'
+  },
+  {
+    id: 'prod-jasa-05',
+    barcode: 'JASA-BL-01',
+    name: 'Cetak Baliho / Spanduk Flexi 280gr (Outdoor)',
+    type: 'jasa',
+    category: 'Percetakan & Banner',
+    brandOrPublisher: 'Mesin Solvent 3.2m',
+    costPrice: 12000,
+    sellPrice: 25000,
+    stock: 99999,
+    minStockAlert: 0,
+    unit: 'Meter',
+    shelfLocation: 'Area Percetakan Luar',
+    imageUrl: 'https://images.unsplash.com/photo-1542744094-3a31f272c490?q=80&w=400&auto=format&fit=crop',
+    createdAt: '2026-09-01T08:00:00Z',
+    updatedAt: '2026-09-22T10:00:00Z'
+  },
+  {
+    id: 'prod-jasa-06',
+    barcode: 'JASA-BN-01',
+    name: 'Cetak X-Banner 60x160cm (+ Rangka Tiang)',
+    type: 'jasa',
+    category: 'Percetakan & Banner',
+    brandOrPublisher: 'Indoor High-Res',
+    costPrice: 42000,
+    sellPrice: 75000,
+    stock: 99999,
+    minStockAlert: 0,
+    unit: 'Set',
+    shelfLocation: 'Display Banner Toko',
+    imageUrl: 'https://images.unsplash.com/photo-1542744094-3a31f272c490?q=80&w=400&auto=format&fit=crop',
+    createdAt: '2026-09-01T08:00:00Z',
+    updatedAt: '2026-09-22T10:00:00Z'
+  },
+  {
+    id: 'prod-jasa-07',
+    barcode: 'JASA-JL-01',
+    name: 'Jilid Lakban Hitam & Mika Bening (Skripsi/Makalah)',
+    type: 'jasa',
+    category: 'Jilid & Finishing',
+    brandOrPublisher: 'Finishing Meja 1',
+    costPrice: 1000,
+    sellPrice: 3500,
+    stock: 99999,
+    minStockAlert: 0,
+    unit: 'Buku',
+    shelfLocation: 'Meja Finishing & Jilid',
+    imageUrl: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?q=80&w=400&auto=format&fit=crop',
+    createdAt: '2026-09-01T08:00:00Z',
+    updatedAt: '2026-09-22T10:00:00Z'
+  },
+  {
+    id: 'prod-jasa-08',
+    barcode: 'JASA-JL-02',
+    name: 'Jilid Spiral Kawat + Cover Mika Depan Belakang',
+    type: 'jasa',
+    category: 'Jilid & Finishing',
+    brandOrPublisher: 'Mesin Spiral Kawat',
+    costPrice: 4000,
+    sellPrice: 12000,
+    stock: 99999,
+    minStockAlert: 0,
+    unit: 'Buku',
+    shelfLocation: 'Meja Finishing & Jilid',
+    imageUrl: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?q=80&w=400&auto=format&fit=crop',
+    createdAt: '2026-09-01T08:00:00Z',
+    updatedAt: '2026-09-22T10:00:00Z'
+  },
+  {
+    id: 'prod-jasa-09',
+    barcode: 'JASA-LM-01',
+    name: 'Laminating Panas Presisi A4/F4 (Ijazah/Sertifikat)',
+    type: 'jasa',
+    category: 'Jilid & Finishing',
+    brandOrPublisher: 'Mesin Roll Panas',
+    costPrice: 1200,
+    sellPrice: 5000,
+    stock: 99999,
+    minStockAlert: 0,
+    unit: 'Lembar',
+    shelfLocation: 'Meja Laminating Depan',
+    imageUrl: 'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?q=80&w=400&auto=format&fit=crop',
+    createdAt: '2026-09-01T08:00:00Z',
+    updatedAt: '2026-09-22T10:00:00Z'
+  },
+  {
+    id: 'prod-jasa-10',
+    barcode: 'JASA-SC-01',
+    name: 'Scan Dokumen ke PDF / JPG / Flashdisk',
+    type: 'jasa',
+    category: 'Fotocopy & Dokumen',
+    brandOrPublisher: 'Scanner Flatbed A4/F4',
+    costPrice: 0,
+    sellPrice: 1000,
+    stock: 99999,
+    minStockAlert: 0,
+    unit: 'Halaman',
+    shelfLocation: 'PC Kasir / Cetak',
+    imageUrl: 'https://images.unsplash.com/photo-1588702547923-7093a6c3ba33?q=80&w=400&auto=format&fit=crop',
+    createdAt: '2026-09-01T08:00:00Z',
+    updatedAt: '2026-09-22T10:00:00Z'
   }
 ];
 
@@ -426,11 +600,25 @@ class DatabaseService {
     ];
   }
 
-  // --- CRUD PRODUK (Buku & Alat Tulis) ---
+  // --- CRUD PRODUK (Buku, Alat Tulis & Layanan Jasa) ---
   public getProducts(): ProductItem[] {
     if (!this.isBrowser) return INITIAL_PRODUCTS;
     const raw = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
-    return raw ? JSON.parse(raw) : INITIAL_PRODUCTS;
+    if (!raw) return INITIAL_PRODUCTS;
+    try {
+      const list: ProductItem[] = JSON.parse(raw);
+      // Auto-migrate: Pastikan produk layanan & jasa (fotocopy, print, baliho) otomatis ditambahkan jika belum ada
+      const hasServices = list.some(p => p.type === 'jasa');
+      if (!hasServices) {
+        const services = INITIAL_PRODUCTS.filter(p => p.type === 'jasa');
+        const merged = [...list, ...services];
+        localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(merged));
+        return merged;
+      }
+      return list;
+    } catch {
+      return INITIAL_PRODUCTS;
+    }
   }
 
   public saveProduct(product: ProductItem): void {
@@ -484,16 +672,21 @@ class DatabaseService {
     transactions.unshift(transaction);
     localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
 
-    // Kurangi stok barang secara otomatis dari inventaris
+    // Kurangi stok barang fisik dari inventaris (kecuali layanan/jasa yang stoknya unlimited)
     const products = this.getProducts();
     for (const item of transaction.items) {
       const prod = products.find(p => p.id === item.product.id);
-      if (prod) {
+      if (prod && prod.type !== 'jasa') {
         prod.stock = Math.max(0, prod.stock - item.quantity);
         prod.updatedAt = new Date().toISOString();
       }
     }
     localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+
+    // Jika transaksi tunai berhasil, catat penjualan tunai ke shift aktif
+    if (transaction.status === 'completed' && transaction.paymentMethod === 'cash') {
+      this.recordCashSaleInShift(transaction.grandTotal);
+    }
   }
 
   public refundTransaction(transactionId: string): boolean {
@@ -505,17 +698,139 @@ class DatabaseService {
     tx.status = 'refunded';
     localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
 
-    // Kembalikan stok fisik ke inventaris
+    // Kembalikan stok fisik ke inventaris (kecuali layanan/jasa)
     const products = this.getProducts();
     for (const item of tx.items) {
       const prod = products.find(p => p.id === item.product.id);
-      if (prod) {
+      if (prod && prod.type !== 'jasa') {
         prod.stock += item.quantity;
         prod.updatedAt = new Date().toISOString();
       }
     }
     localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+
+    // Jika pengembalian transaksi tunai, kurangi kas penjualan shift
+    if (tx.paymentMethod === 'cash') {
+      this.recordCashSaleInShift(-tx.grandTotal);
+    }
+
     return true;
+  }
+
+  // --- MANAJEMEN SHIFT KASIR & KAS LACI ---
+  public getShifts(): CashierShift[] {
+    if (!this.isBrowser) return [];
+    const raw = localStorage.getItem(STORAGE_KEYS.SHIFTS);
+    return raw ? JSON.parse(raw) : [];
+  }
+
+  public getActiveShift(): CashierShift | null {
+    const shifts = this.getShifts();
+    return shifts.find(s => s.status === 'open') || null;
+  }
+
+  public startShift(cashierName: string, startingCash: number, notes?: string): CashierShift {
+    const active = this.getActiveShift();
+    if (active) return active;
+
+    const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    const newShift: CashierShift = {
+      id: `SHIFT-${dateStr}-${rand}`,
+      cashierName: cashierName.trim() || 'Kasir Toko',
+      startTime: new Date().toISOString(),
+      startingCash,
+      cashSales: 0,
+      cashIn: 0,
+      cashOut: 0,
+      expectedCash: startingCash,
+      status: 'open',
+      notes
+    };
+
+    const shifts = this.getShifts();
+    shifts.unshift(newShift);
+    localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(shifts));
+    return newShift;
+  }
+
+  public getCashMovements(): CashMovement[] {
+    if (!this.isBrowser) return [];
+    const raw = localStorage.getItem(STORAGE_KEYS.CASH_MOVEMENTS);
+    return raw ? JSON.parse(raw) : [];
+  }
+
+  public getCashMovementsForShift(shiftId: string): CashMovement[] {
+    return this.getCashMovements().filter(m => m.shiftId === shiftId);
+  }
+
+  public addCashMovement(
+    type: 'in' | 'out',
+    amount: number,
+    category: string,
+    note: string,
+    cashierName?: string
+  ): CashMovement | null {
+    const activeShift = this.getActiveShift();
+    if (!activeShift) return null;
+
+    const newMovement: CashMovement = {
+      id: `CASH-${Date.now()}`,
+      shiftId: activeShift.id,
+      timestamp: new Date().toISOString(),
+      type,
+      amount,
+      category,
+      note,
+      cashierName: cashierName || activeShift.cashierName
+    };
+
+    const movements = this.getCashMovements();
+    movements.unshift(newMovement);
+    localStorage.setItem(STORAGE_KEYS.CASH_MOVEMENTS, JSON.stringify(movements));
+
+    // Update active shift totals
+    if (type === 'in') {
+      activeShift.cashIn += amount;
+    } else {
+      activeShift.cashOut += amount;
+    }
+    activeShift.expectedCash = activeShift.startingCash + activeShift.cashSales + activeShift.cashIn - activeShift.cashOut;
+
+    const shifts = this.getShifts().map(s => s.id === activeShift.id ? activeShift : s);
+    localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(shifts));
+
+    return newMovement;
+  }
+
+  public closeShift(actualCash: number, notes?: string): CashierShift | null {
+    const activeShift = this.getActiveShift();
+    if (!activeShift) return null;
+
+    const expectedCash = activeShift.startingCash + activeShift.cashSales + activeShift.cashIn - activeShift.cashOut;
+    const difference = actualCash - expectedCash;
+
+    activeShift.endTime = new Date().toISOString();
+    activeShift.expectedCash = expectedCash;
+    activeShift.actualCash = actualCash;
+    activeShift.difference = difference;
+    activeShift.status = 'closed';
+    if (notes) activeShift.notes = (activeShift.notes ? activeShift.notes + ' | ' : '') + notes;
+
+    const shifts = this.getShifts().map(s => s.id === activeShift.id ? activeShift : s);
+    localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(shifts));
+    return activeShift;
+  }
+
+  public recordCashSaleInShift(amount: number): void {
+    const activeShift = this.getActiveShift();
+    if (!activeShift) return;
+
+    activeShift.cashSales += amount;
+    activeShift.expectedCash = activeShift.startingCash + activeShift.cashSales + activeShift.cashIn - activeShift.cashOut;
+
+    const shifts = this.getShifts().map(s => s.id === activeShift.id ? activeShift : s);
+    localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(shifts));
   }
 
   // --- TAHAN TRANSAKSI (Hold / Recall Orders) ---

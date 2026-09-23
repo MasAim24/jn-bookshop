@@ -15,24 +15,32 @@ import {
   Check, 
   ArrowUpDown,
   DollarSign,
-  PackageCheck
+  PackageCheck,
+  Barcode,
+  Printer,
+  Sparkles
 } from 'lucide-react';
-import { ProductItem, ProductType } from '../../types/pos';
+import { ProductItem, ProductType, StoreProfile } from '../../types/pos';
 import { dbService, formatRupiah } from '../../services/db';
+import { BarcodePrintModal } from './BarcodePrintModal';
 
 interface InventoryManagerProps {
   products: ProductItem[];
   refreshData: () => void;
+  storeProfile?: StoreProfile;
 }
 
 export const InventoryManager: React.FC<InventoryManagerProps> = ({
   products,
-  refreshData
+  refreshData,
+  storeProfile
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'buku' | 'alat_tulis' | 'low_stock'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'buku' | 'alat_tulis' | 'jasa' | 'low_stock'>('all');
   const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
+  const [barcodeSelectedProduct, setBarcodeSelectedProduct] = useState<ProductItem | null>(null);
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
   const [adjustingProduct, setAdjustingProduct] = useState<ProductItem | null>(null);
 
@@ -65,15 +73,16 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
     if (!matchesSearch) return false;
     if (filterType === 'buku') return p.type === 'buku';
     if (filterType === 'alat_tulis') return p.type === 'alat_tulis';
-    if (filterType === 'low_stock') return p.stock <= p.minStockAlert;
+    if (filterType === 'jasa') return p.type === 'jasa';
+    if (filterType === 'low_stock') return p.type !== 'jasa' && p.stock <= p.minStockAlert;
     return true;
   });
 
   // KPI Ringkasan Inventaris
   const totalItemsCount = products.length;
-  const totalPhysicalStock = products.reduce((acc, p) => acc + p.stock, 0);
-  const totalAssetValue = products.reduce((acc, p) => acc + (p.costPrice * p.stock), 0);
-  const lowStockCount = products.filter(p => p.stock <= p.minStockAlert).length;
+  const totalPhysicalStock = products.filter(p => p.type !== 'jasa').reduce((acc, p) => acc + p.stock, 0);
+  const totalAssetValue = products.filter(p => p.type !== 'jasa').reduce((acc, p) => acc + (p.costPrice * p.stock), 0);
+  const lowStockCount = products.filter(p => p.type !== 'jasa' && p.stock <= p.minStockAlert).length;
 
   // Buka Form Tambah
   const handleOpenAddModal = () => {
@@ -117,19 +126,20 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
       return;
     }
 
+    const isJasa = formType === 'jasa';
     const newProd: ProductItem = {
       id: editingProduct ? editingProduct.id : `prod-${Date.now()}`,
       barcode: formBarcode.trim(),
       name: formName.trim(),
       type: formType,
-      category: formCategory.trim() || 'Umum',
-      brandOrPublisher: formBrand.trim() || undefined,
+      category: formCategory.trim() || (isJasa ? 'Layanan & Percetakan' : 'Umum'),
+      brandOrPublisher: formBrand.trim() || (isJasa ? 'Mesin / Station Kasir' : undefined),
       costPrice: Number(formCostPrice) || 0,
       sellPrice: Number(formSellPrice) || 0,
-      stock: Number(formStock) || 0,
-      minStockAlert: Number(formMinAlert) || 5,
-      unit: formUnit.trim() || 'Pcs',
-      shelfLocation: formShelf.trim() || 'Rak Toko',
+      stock: isJasa ? 99999 : (Number(formStock) || 0),
+      minStockAlert: isJasa ? 0 : (Number(formMinAlert) || 5),
+      unit: formUnit.trim() || (isJasa ? 'Lembar' : 'Pcs'),
+      shelfLocation: formShelf.trim() || (isJasa ? 'Area Percetakan' : 'Rak Toko'),
       createdAt: editingProduct ? editingProduct.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -218,6 +228,17 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setBarcodeSelectedProduct(null);
+                setIsBarcodeModalOpen(true);
+              }}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Barcode className="w-4 h-4 text-amber-400" />
+              <span>Cetak Label Barcode</span>
+            </button>
+
             <button
               onClick={handleExportCSV}
               className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg flex items-center gap-1.5 transition-colors"
@@ -314,8 +335,19 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
               <span>Alat Tulis</span>
             </button>
             <button
+              onClick={() => setFilterType('jasa')}
+              className={`px-3 py-2 rounded-lg font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
+                filterType === 'jasa'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Layanan & Jasa ({products.filter(p => p.type === 'jasa').length})</span>
+            </button>
+            <button
               onClick={() => setFilterType('low_stock')}
-              className={`px-3 py-2 rounded-lg font-medium flex items-center gap-1.5 transition-colors ${
+              className={`px-3 py-2 rounded-lg font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
                 filterType === 'low_stock'
                   ? 'bg-amber-600 text-white'
                   : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
@@ -334,14 +366,14 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-slate-950/80 text-slate-400 border-b border-slate-800 font-semibold uppercase text-[10px] tracking-wider">
               <tr>
-                <th className="py-3 px-3">Barcode / ISBN</th>
-                <th className="py-3 px-3">Nama Produk & Kategori</th>
+                <th className="py-3 px-3">Barcode / SKU</th>
+                <th className="py-3 px-3">Nama Produk / Layanan</th>
                 <th className="py-3 px-3">Tipe</th>
-                <th className="py-3 px-3 text-right">Harga Beli (HPP)</th>
+                <th className="py-3 px-3 text-right">Harga Modal (HPP)</th>
                 <th className="py-3 px-3 text-right">Harga Jual</th>
                 <th className="py-3 px-3 text-center">Margin %</th>
                 <th className="py-3 px-3 text-center">Stok Fisik</th>
-                <th className="py-3 px-3">Lokasi Rak</th>
+                <th className="py-3 px-3">Lokasi / Mesin</th>
                 <th className="py-3 px-3 text-right">Aksi</th>
               </tr>
             </thead>
@@ -354,8 +386,9 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
                 </tr>
               ) : (
                 filteredProducts.map(product => {
-                  const isOutOfStock = product.stock <= 0;
-                  const isLow = product.stock > 0 && product.stock <= product.minStockAlert;
+                  const isService = product.type === 'jasa';
+                  const isOutOfStock = !isService && product.stock <= 0;
+                  const isLow = !isService && product.stock > 0 && product.stock <= product.minStockAlert;
                   const margin = product.costPrice > 0 
                     ? Math.round(((product.sellPrice - product.costPrice) / product.costPrice) * 100) 
                     : 0;
@@ -385,9 +418,11 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
                         <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${
                           product.type === 'buku'
                             ? 'bg-blue-950 text-blue-300 border border-blue-800/40'
-                            : 'bg-amber-950 text-amber-300 border border-amber-800/40'
+                            : product.type === 'alat_tulis'
+                            ? 'bg-amber-950 text-amber-300 border border-amber-800/40'
+                            : 'bg-purple-950 text-purple-300 border border-purple-800/40'
                         }`}>
-                          {product.type === 'buku' ? 'Buku' : 'ATK'}
+                          {product.type === 'buku' ? 'Buku' : product.type === 'alat_tulis' ? 'ATK' : 'Jasa'}
                         </span>
                       </td>
 
@@ -410,15 +445,21 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
 
                       {/* Stok Fisik */}
                       <td className="py-3 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded font-mono font-bold text-[11px] ${
-                          isOutOfStock
-                            ? 'bg-rose-950 text-rose-400 border border-rose-800/50'
-                            : isLow
-                            ? 'bg-amber-950 text-amber-300 border border-amber-800/50'
-                            : 'bg-slate-800 text-slate-200'
-                        }`}>
-                          {product.stock} {product.unit}
-                        </span>
+                        {isService ? (
+                          <span className="px-2 py-0.5 rounded font-mono text-[10px] bg-purple-950/80 text-purple-300 border border-purple-800/40 font-semibold">
+                            Non-Fisik ({product.unit})
+                          </span>
+                        ) : (
+                          <span className={`px-2 py-0.5 rounded font-mono font-bold text-[11px] ${
+                            isOutOfStock
+                              ? 'bg-rose-950 text-rose-400 border border-rose-800/50'
+                              : isLow
+                              ? 'bg-amber-950 text-amber-300 border border-amber-800/50'
+                              : 'bg-slate-800 text-slate-200'
+                          }`}>
+                            {product.stock} {product.unit}
+                          </span>
+                        )}
                       </td>
 
                       {/* Lokasi Rak */}
@@ -429,6 +470,17 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
                       {/* Aksi */}
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => {
+                              setBarcodeSelectedProduct(product);
+                              setIsBarcodeModalOpen(true);
+                            }}
+                            className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 transition-colors"
+                            title="Cetak Label Barcode & Harga"
+                          >
+                            <Barcode className="w-3.5 h-3.5" />
+                          </button>
+
                           <button
                             onClick={() => handleOpenAdjustModal(product)}
                             className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 transition-colors"
@@ -484,35 +536,167 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
               {/* Tipe Produk */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Tipe Produk
+                  Tipe Produk / Layanan
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => setFormType('buku')}
-                    className={`py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-2 ${
+                    onClick={() => {
+                      setFormType('buku');
+                      if (formBarcode.startsWith('JASA-')) {
+                        setFormBarcode(`JNB-${Math.floor(100000000 + Math.random() * 900000000)}`);
+                      }
+                    }}
+                    className={`py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-2 cursor-pointer transition-all ${
                       formType === 'buku'
                         ? 'bg-blue-950/80 border-blue-500 text-blue-300'
-                        : 'bg-slate-950 border-slate-800 text-slate-400'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
                     }`}
                   >
                     <BookOpen className="w-4 h-4" />
-                    <span>Buku / Novel / Komik</span>
+                    <span>Buku & Novel</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setFormType('alat_tulis')}
-                    className={`py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-2 ${
+                    onClick={() => {
+                      setFormType('alat_tulis');
+                      if (formBarcode.startsWith('JASA-')) {
+                        setFormBarcode(`JNB-${Math.floor(100000000 + Math.random() * 900000000)}`);
+                      }
+                    }}
+                    className={`py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-2 cursor-pointer transition-all ${
                       formType === 'alat_tulis'
                         ? 'bg-amber-950/80 border-amber-500 text-amber-300'
-                        : 'bg-slate-950 border-slate-800 text-slate-400'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
                     }`}
                   >
                     <PenTool className="w-4 h-4" />
-                    <span>Alat Tulis & Kertas (ATK)</span>
+                    <span>Alat Tulis (ATK)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormType('jasa');
+                      if (!formBarcode.startsWith('JASA-')) {
+                        setFormBarcode(`JASA-${Math.floor(1000 + Math.random() * 9000)}`);
+                      }
+                      setFormUnit('Lembar');
+                      setFormCategory('Layanan & Percetakan');
+                    }}
+                    className={`py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                      formType === 'jasa'
+                        ? 'bg-purple-950/80 border-purple-500 text-purple-300 shadow-sm'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>Layanan & Jasa</span>
                   </button>
                 </div>
+
+                {/* Template Cepat Layanan & Percetakan */}
+                {formType === 'jasa' && (
+                  <div className="mt-2.5 p-2.5 rounded-xl bg-purple-950/30 border border-purple-800/40 space-y-1.5 animate-fadeIn">
+                    <span className="text-[11px] text-purple-300 font-semibold flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Pilih Template Layanan Cepat:</span>
+                    </span>
+                    <div className="flex flex-wrap gap-1.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormName('Fotocopy HVS A4/F4 (Hitam Putih)');
+                          setFormCategory('Fotocopy & Dokumen');
+                          setFormCostPrice(100);
+                          setFormSellPrice(350);
+                          setFormUnit('Lembar');
+                          setFormShelf('Mesin Fotocopy Depan');
+                          setFormBrand('Mesin IR 6000');
+                        }}
+                        className="px-2 py-1 rounded-md bg-slate-900 border border-slate-700 hover:border-purple-400 text-slate-300 hover:text-white text-[11px] cursor-pointer"
+                      >
+                        📄 Fotocopy Hitam Putih (Rp 350)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormName('Fotocopy Warna A4/F4');
+                          setFormCategory('Fotocopy & Dokumen');
+                          setFormCostPrice(500);
+                          setFormSellPrice(1500);
+                          setFormUnit('Lembar');
+                          setFormShelf('Mesin Fotocopy Warna');
+                          setFormBrand('Konica Minolta');
+                        }}
+                        className="px-2 py-1 rounded-md bg-slate-900 border border-slate-700 hover:border-purple-400 text-slate-300 hover:text-white text-[11px] cursor-pointer"
+                      >
+                        🎨 Fotocopy Warna (Rp 1.500)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormName('Print Dokumen Warna A4 (Tinta Inkjet)');
+                          setFormCategory('Print & Digital Output');
+                          setFormCostPrice(800);
+                          setFormSellPrice(2500);
+                          setFormUnit('Lembar');
+                          setFormShelf('PC Cetak Kasir');
+                          setFormBrand('Epson L-Series');
+                        }}
+                        className="px-2 py-1 rounded-md bg-slate-900 border border-slate-700 hover:border-purple-400 text-slate-300 hover:text-white text-[11px] cursor-pointer"
+                      >
+                        🖨️ Print Warna A4 (Rp 2.500)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormName('Cetak Baliho / Spanduk Flexi 280gr (Outdoor)');
+                          setFormCategory('Percetakan & Banner');
+                          setFormCostPrice(12000);
+                          setFormSellPrice(25000);
+                          setFormUnit('Meter');
+                          setFormShelf('Mesin Outdoor 3.2m');
+                          setFormBrand('Outdoor Solvent');
+                        }}
+                        className="px-2 py-1 rounded-md bg-slate-900 border border-slate-700 hover:border-purple-400 text-slate-300 hover:text-white text-[11px] cursor-pointer"
+                      >
+                        🚩 Cetak Baliho/Spanduk (Rp 25.000/m²)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormName('Jilid Spiral Kawat + Cover Mika');
+                          setFormCategory('Jilid & Finishing');
+                          setFormCostPrice(4000);
+                          setFormSellPrice(12000);
+                          setFormUnit('Buku');
+                          setFormShelf('Meja Jilid & Finishing');
+                          setFormBrand('Spiral Kawat');
+                        }}
+                        className="px-2 py-1 rounded-md bg-slate-900 border border-slate-700 hover:border-purple-400 text-slate-300 hover:text-white text-[11px] cursor-pointer"
+                      >
+                        📒 Jilid Spiral Kawat (Rp 12.000)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormName('Laminating Panas Presisi A4/F4');
+                          setFormCategory('Jilid & Finishing');
+                          setFormCostPrice(1200);
+                          setFormSellPrice(5000);
+                          setFormUnit('Lembar');
+                          setFormShelf('Mesin Roll Panas');
+                          setFormBrand('Mesin Laminating');
+                        }}
+                        className="px-2 py-1 rounded-md bg-slate-900 border border-slate-700 hover:border-purple-400 text-slate-300 hover:text-white text-[11px] cursor-pointer"
+                      >
+                        ✨ Laminating Panas (Rp 5.000)
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Barcode & Nama */}
@@ -618,59 +802,105 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
               </div>
 
               {/* Stok, Alert, Satuan, dan Lokasi Rak */}
-              <div className="grid grid-cols-4 gap-2.5">
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Stok Awal
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formStock}
-                    onChange={(e) => setFormStock(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-100"
-                  />
-                </div>
+              {formType === 'jasa' ? (
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-purple-950/20 border border-purple-800/40">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Satuan Hitung Layanan *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formUnit}
+                      onChange={(e) => setFormUnit(e.target.value)}
+                      placeholder="Lembar, Halaman, Meter (m²), Buku, Set"
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 font-medium focus:border-purple-500"
+                    />
+                    <div className="flex gap-1.5 mt-1.5 text-[10px]">
+                      {['Lembar', 'Meter', 'Buku', 'Set', 'Halaman'].map(u => (
+                        <button
+                          key={u}
+                          type="button"
+                          onClick={() => setFormUnit(u)}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer"
+                        >
+                          {u}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Min Alert
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formMinAlert}
-                    onChange={(e) => setFormMinAlert(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-100"
-                  />
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Lokasi Mesin / Pos Kerja
+                    </label>
+                    <input
+                      type="text"
+                      value={formShelf}
+                      onChange={(e) => setFormShelf(e.target.value)}
+                      placeholder="e.g. Mesin IR 6000, Meja Jilid, PC Cetak"
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 focus:border-purple-500"
+                    />
+                    <span className="text-[10px] text-purple-300/80 mt-1.5 block">
+                      * Layanan non-fisik tidak dibatasi stok & selalu dapat diorder di kasir
+                    </span>
+                  </div>
                 </div>
+              ) : (
+                <div className="grid grid-cols-4 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Stok Awal
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formStock}
+                      onChange={(e) => setFormStock(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-100"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Satuan
-                  </label>
-                  <input
-                    type="text"
-                    value={formUnit}
-                    onChange={(e) => setFormUnit(e.target.value)}
-                    placeholder="Pcs, Pak, Rim, Eks"
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-100"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Min Alert
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formMinAlert}
+                      onChange={(e) => setFormMinAlert(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-100"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Lokasi Rak
-                  </label>
-                  <input
-                    type="text"
-                    value={formShelf}
-                    onChange={(e) => setFormShelf(e.target.value)}
-                    placeholder="Rak A-01"
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-100"
-                  />
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Satuan
+                    </label>
+                    <input
+                      type="text"
+                      value={formUnit}
+                      onChange={(e) => setFormUnit(e.target.value)}
+                      placeholder="Pcs, Pak, Rim, Eks"
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Lokasi Rak
+                    </label>
+                    <input
+                      type="text"
+                      value={formShelf}
+                      onChange={(e) => setFormShelf(e.target.value)}
+                      placeholder="Rak A-01"
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-100"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Tombol Simpan */}
               <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
@@ -782,6 +1012,16 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal Cetak Label Barcode & Harga Toko */}
+      {isBarcodeModalOpen && (
+        <BarcodePrintModal
+          products={products}
+          initialProduct={barcodeSelectedProduct}
+          storeProfile={storeProfile || dbService.getStoreProfile()}
+          onClose={() => setIsBarcodeModalOpen(false)}
+        />
       )}
     </div>
   );

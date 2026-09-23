@@ -1,8 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Minus, Square, X, HardDrive, Wifi, ShieldCheck } from 'lucide-react';
+import { BookOpen, Minus, Square, X, HardDrive, ShieldCheck, Sun, Moon } from 'lucide-react';
 
-export const WindowsTitleBar: React.FC = () => {
+interface WindowsTitleBarProps {
+  theme?: 'dark' | 'light';
+  toggleTheme?: () => void;
+}
+
+export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
+  theme: propTheme,
+  toggleTheme: propToggleTheme
+}) => {
   const [time, setTime] = useState<string>('');
+  const [internalTheme, setInternalTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('jn_pos_theme') as 'dark' | 'light') || 'dark';
+  });
+
+  const theme = propTheme || internalTheme;
+  const toggleTheme = propToggleTheme || (() => {
+    setInternalTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  });
 
   useEffect(() => {
     const updateTime = () => {
@@ -13,6 +29,18 @@ export const WindowsTitleBar: React.FC = () => {
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('jn_pos_theme', theme);
+  }, [theme]);
 
   const handleMinimize = () => {
     const win = window as any;
@@ -69,29 +97,50 @@ export const WindowsTitleBar: React.FC = () => {
         </div>
       </div>
 
-      {/* Kanan: Windows Window Controls */}
-      <div className="flex items-center space-x-1 -mr-2">
+      {/* Kanan: Theme Toggle & Windows Window Controls */}
+      <div className="flex items-center space-x-2 -mr-1">
+        {/* Theme Switcher Button */}
         <button
-          onClick={handleMinimize}
-          title="Minimize"
-          className="w-8 h-7 flex items-center justify-center hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors"
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Ganti ke Tampilan Terang' : 'Ganti ke Tampilan Gelap'}
+          className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer text-[11px]"
         >
-          <Minus className="w-3.5 h-3.5" />
+          {theme === 'dark' ? (
+            <>
+              <Sun className="w-3 h-3 text-amber-400" />
+              <span className="hidden sm:inline">Terang</span>
+            </>
+          ) : (
+            <>
+              <Moon className="w-3 h-3 text-blue-300" />
+              <span className="hidden sm:inline">Gelap</span>
+            </>
+          )}
         </button>
-        <button
-          onClick={handleMaximize}
-          title="Maximize"
-          className="w-8 h-7 flex items-center justify-center hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors"
-        >
-          <Square className="w-3 h-3" />
-        </button>
-        <button
-          onClick={handleClose}
-          title="Tutup Aplikasi"
-          className="w-8 h-7 flex items-center justify-center hover:bg-rose-600 text-slate-400 hover:text-white transition-colors"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
+
+        <div className="flex items-center space-x-0.5">
+          <button
+            onClick={handleMinimize}
+            title="Minimize"
+            className="w-8 h-7 flex items-center justify-center hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors"
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={handleMaximize}
+            title="Maximize"
+            className="w-8 h-7 flex items-center justify-center hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors"
+          >
+            <Square className="w-3 h-3" />
+          </button>
+          <button
+            onClick={handleClose}
+            title="Tutup Aplikasi"
+            className="w-8 h-7 flex items-center justify-center hover:bg-rose-600 text-slate-400 hover:text-white transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
     </header>
   );

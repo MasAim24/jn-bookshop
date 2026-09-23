@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { X, Printer, Download, Check, Copy } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Printer, Download, Check, Copy, ArrowRight } from 'lucide-react';
 import { POSTransaction, StoreProfile } from '../../types/pos';
 import { ThermalPrinterService } from '../../services/thermalPrinter';
 import { dbService } from '../../services/db';
+import { soundService } from '../../services/sound';
 
 interface ReceiptModalProps {
   transaction: POSTransaction;
@@ -32,6 +33,29 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   const handlePrint = () => {
     ThermalPrinterService.printThermal();
   };
+
+  const handlePrintAndDone = () => {
+    soundService.playSuccess();
+    ThermalPrinterService.printThermal();
+    onClose();
+  };
+
+  // Keyboard shortcut listener: Enter untuk Cetak & Selesai, Esc untuk Tutup
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handlePrintAndDone();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(receiptPlainText);
@@ -153,15 +177,16 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
               onClick={onClose}
               className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-colors"
             >
-              Tutup
+              Tutup (Esc)
             </button>
             <button
               type="button"
-              onClick={handlePrint}
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-950/50 transition-all"
+              onClick={handlePrintAndDone}
+              className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-950/50 transition-all cursor-pointer"
             >
               <Printer className="w-4 h-4" />
-              <span>Cetak Struk Sekarang</span>
+              <span>Cetak & Selesai (Enter)</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1 opacity-80" />
             </button>
           </div>
         </div>
