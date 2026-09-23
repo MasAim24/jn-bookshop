@@ -19,7 +19,12 @@ function createWindow() {
       contextIsolation: true,
       enableRemoteModule: false
     },
-    icon: path.join(__dirname, '../public/favicon.ico')
+    ...(fs.existsSync(path.join(__dirname, '../public/favicon.ico')) ? { icon: path.join(__dirname, '../public/favicon.ico') } : {})
+  });
+
+  // Tangani kegagalan load file
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error('Gagal memuat URL:', validatedURL, errorCode, errorDescription);
   });
 
   // Di mode produksi, muat file dist/index.html
@@ -27,11 +32,22 @@ function createWindow() {
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    const indexPath = path.join(__dirname, '../dist/index.html');
+    mainWindow.loadFile(indexPath).catch(err => {
+      console.error('Gagal loadFile:', indexPath, err);
+    });
   }
 
   // Sembunyikan menu bar standar Windows (File, Edit, dll) agar UI bersih seperti aplikasi POS kasir modern
   mainWindow.setMenuBarVisibility(false);
+
+  // Shortcut F12 untuk toggle DevTools (membantu diagnosa antarmuka)
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
