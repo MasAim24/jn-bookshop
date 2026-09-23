@@ -21,8 +21,7 @@
         "arch": ["x64"]
       }
     ],
-    "icon": "public/favicon.ico",
-    "artifactName": "${productName}-${version}-${target}.${ext}"
+    "icon": "public/favicon.ico"
   },
   "nsis": {
     "oneClick": false,
@@ -31,7 +30,8 @@
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
     "shortcutName": "JN Book & Stationary Shop",
-    "runAfterFinish": true
+    "runAfterFinish": true,
+    "artifactName": "${productName}-Setup-${version}.${ext}"
   },
   "portable": {
     "artifactName": "${productName}-Portable.${ext}"

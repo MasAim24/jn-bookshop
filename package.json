@@ -3,6 +3,7 @@
   "productName": "JN Book & Stationary Shop",
   "version": "1.0.0",
   "description": "Aplikasi Desktop Kasir/POS & Manajemen Stok Toko Buku dan Alat Tulis",
+  "author": "JN Bookshop <dev@jnbookshop.id>",
   "main": "electron/main.cjs",
   "private": true,
   "type": "module",

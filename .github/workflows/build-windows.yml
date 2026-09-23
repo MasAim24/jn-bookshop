@@ -17,7 +17,7 @@ jobs:
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: 📦 Setup pnpm
         uses: pnpm/action-setup@v3
@@ -32,7 +32,7 @@ jobs:
       - name: 🔨 Compile Frontend & Build Windows .EXE
         run: |
           pnpm run build
-          npx electron-builder --win nsis portable
+          npx electron-builder --win nsis portable --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
